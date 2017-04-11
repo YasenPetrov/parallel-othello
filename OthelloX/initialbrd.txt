@@ -1,0 +1,3 @@
+Size: 8,8
+White: { e4, d5 }
+Black: { e5, d4 }

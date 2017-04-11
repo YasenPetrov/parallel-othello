@@ -1,0 +1,6 @@
+MaxDepth: 100	
+MaxBoards : 10000000
+ParityWeight : 0.3
+MobilityWeight : 0.4
+Color : Black
+Timeout : 15
