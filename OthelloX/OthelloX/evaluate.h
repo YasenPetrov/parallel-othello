@@ -9,4 +9,4 @@
 
 // Evaluates a board in an intermediate state
 // max - it is MAX's turn?
-int evalBoard(const board &state, bool max);
+int evalBoard(const board &state);

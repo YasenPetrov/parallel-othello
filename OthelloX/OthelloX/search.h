@@ -20,8 +20,10 @@ struct valueMove
 	gameMove move;
 };
 
-// Search function, returns next bext move for MAX
-gameMove search(board &state);
-
-valueMove minValue(const board &state, int alpha, int beta, short depth);
-valueMove maxValue(const board &state, int alpha, int beta, short depth);
+/*
+Returns the next best moves in descending order(best to worst)
+state - the current board state
+maxDepth - maximmum depth for the search
+isProbe - is this a shallow probe, used to estimate the next best moves
+*/
+vector<gameMove> treeSearch(const board &state, short maxDepth, bool isProbe);

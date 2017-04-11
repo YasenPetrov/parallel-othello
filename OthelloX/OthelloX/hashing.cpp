@@ -21,6 +21,8 @@ unsigned long long getHash(const board &state)
 			hash ^= _randomNumbers[state[i][j] + 1][i * state.size() + j];
 		}
 	}
+	
+	return hash;
 }
 
 void initZorbistTable(int N, int M)

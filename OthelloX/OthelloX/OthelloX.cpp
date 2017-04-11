@@ -43,16 +43,16 @@ int main(int argc, char** argv)
 	{
 		cout << "Calculating next move ..." << endl;
 		startTimer();
-		gameMove nextMove = search(state);
+		vector<gameMove> nextMoves = treeSearch(state, _parameters.maxDepth, false);
 		secondsForSearch = secondsElapsed();
 		
-		if (nextMove.x == -1 && nextMove.y == -1)
+		if (nextMoves.size() == 0)
 		{
 			LOG_ERR("Search did not produce a valid move");
 			return -1;
 		}
 
-		state = applyMove(state, nextMove, _parameters.black);
+		state = applyMove(state, nextMoves[0], _parameters.black);
 
 		cout << endl << printBoard(state, _parameters.black);
 		cout << "Number of boards assesed: " << _boardsEvaluated << endl;

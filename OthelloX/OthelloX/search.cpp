@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "search.h"
 
+#define MOVE_ORDER_SEARCH_DEPTH 2
+
 // The parameters for searching
 evalParams _parameters;
 
@@ -9,33 +11,50 @@ unsigned int _boardsEvaluated = 0;
 // The maximum depth we reached
 int _maxDepthReached = 0;
 // Have we looked through the entire search space
-bool _entireSpaceCovered;
+bool _entireSpaceCovered = true;
 
 
-valueMove maxValue(const board &state, int alpha, int beta, short depth)
+int negaMax(const board &state, short depth, short alpha, short beta, bool maxTurn, bool isProbe)
 {
-	if (depth > _maxDepthReached) _maxDepthReached = depth;
+	LOG_DEBUG("Negamax, MAX: " << maxTurn << " probe: " << isProbe << " depth: " << depth << " alpha: " << alpha << " beta: " << beta << " board: " << endl << printBoard(state, maxTurn));
 
-	// If we've reached the max depth or we reach the time cutoff, return an estimated utility value
-	if (depth == _parameters.maxDepth || secondsElapsed() > _parameters.timeout)
+	if (!isProbe && _parameters.maxDepth - depth > _maxDepthReached) _maxDepthReached = _parameters.maxDepth = depth;
+
+	if (depth == 0 || secondsElapsed() > _parameters.timeout)
 	{
 		_boardsEvaluated++;
 		_entireSpaceCovered = false;
-		return { evalBoard(state, true), {-1, -1} };
+		// Always evaluate for MAX!
+		return evalBoard(state);
 	}
 
-	// Get next moves
-	vector<gameMove> moves = getMoves(state, true);
-	/*LOG_DEBUG("maxValue - board:\n" << printBoard(state, true) << "\n And moves:");
-#ifdef _DEBUG
-	for (auto it = moves.begin(); it != moves.end(); it++)
+	vector<gameMove> moves;
+
+	if (isProbe)
 	{
-		LOG_DEBUG((char)(it->y + 'A') << it->x + 1);
+		moves = getMoves(state, maxTurn);
+		LOG_DEBUG("MoveS count: " << moves.size());
+	}
+	else
+	{
+		moves = treeSearch(state, MOVE_ORDER_SEARCH_DEPTH, true);
 	}
 
-#endif // _DEBUG*/
+	// If no moves - evaluate board
+	if (moves.size() == 0)
+	{
+		vector<gameMove> opponentMoves = getMoves(state, !maxTurn);
 
-
+		if (opponentMoves.size() == 0)
+		{
+			_boardsEvaluated++;
+			return evalBoard(state);
+		}
+		else
+		{
+			return -negaMax(state, depth, -beta, -alpha, !maxTurn, isProbe);
+		}
+	}
 
 	// If we will run out of boards while evaluating the children of this node -
 	// return an esimated utility value for this node
@@ -43,170 +62,64 @@ valueMove maxValue(const board &state, int alpha, int beta, short depth)
 	{
 		_boardsEvaluated++;
 		_entireSpaceCovered = false;
-		return { evalBoard(state, true), {-1, -1} };
+		return evalBoard(state);
 	}
 
-	// If no moves - check if opposing player has moves
-	// If so, run minValue. Else, return a final evaluation
-	if (moves.size() == 0)
-	{
-		if (getMoves(state, false).size() == 0)
-		{
-			LOG_DEBUG("Out of moves for both players, board:");
-			LOG_DEBUG(printBoard(state, true));
-
-			_boardsEvaluated++;
-			return { evalBoard(state, true), {-1, -1} };
-		}
-		else
-		{
-			LOG_DEBUG("Out of moves for MAX(printed in black), board:");
-			LOG_DEBUG(printBoard(state, true));
-			return minValue(state, alpha, beta, depth);
-		}
-	}
-
-	// Else, get the best possible value for a next move
-	int value = INT_MIN;
-	gameMove nextMove = { -1, -1 };
+	int maxValue = INT_MIN + 1;
 
 	for (auto it = moves.begin(); it != moves.end(); it++)
 	{
-		// Recursive call
-		valueMove next = minValue(applyMove(state, *(it), true), alpha, beta, depth + 1);
-		
-		if (next.value > value)
-		{
-			value = next.value;
-			nextMove = *(it);
-		}
-		// Prune node if value bigger than beta
-		if (value > beta)
-			return { value, *(it) };
+		int value = -negaMax(applyMove(state, *(it), maxTurn), depth - 1, -beta, -alpha, !maxTurn, isProbe);
 
-		// Update alpha
-		alpha = max(value, alpha);
+		if (value > maxValue) maxValue = value;
+
+		if (maxValue > alpha)
+		{
+			alpha = maxValue;
+			if (maxValue >= beta)
+			{
+				_boardsEvaluated++;
+				return evalBoard(state);
+			}
+		}
 	}
 
-	return { value, nextMove };
+	return maxValue;
 }
 
-valueMove minValue(const board &state, int alpha, int beta, short depth)
+
+vector<gameMove> treeSearch(const board &state, short maxDepth, bool isProbe)
 {
-	if (depth > _maxDepthReached) _maxDepthReached = depth;
-
-	// If we've reached the max depth or we reach the time cutoff, return an estimated utility value
-	if (depth == _parameters.maxDepth || secondsElapsed() > _parameters.timeout)
-	{
-		_boardsEvaluated++;
-		_entireSpaceCovered = false;
-		return { evalBoard(state, false),{ -1, -1 } };
-	}
-
-	// Get next moves
-	vector<gameMove> moves = getMoves(state, false);
-	
-/*	LOG_DEBUG("minValue - board:\n" << printBoard(state, true) << "And moves:");
-#ifdef _DEBUG
-	for (auto it = moves.begin(); it != moves.end(); it++)
-	{
-		LOG_DEBUG((char)(it->y + 'A') << it->x + 1);
-	}
-
-#endif // _DEBUG */
-
-	// If we will run out of boards while evaluating the children of this node -
-	// return an esimated utility value for this node
-	if (_boardsEvaluated + moves.size() > _parameters.maxBoards)
-	{
-		_boardsEvaluated++;
-		_entireSpaceCovered = false;
-		return { evalBoard(state, false),{ -1, -1 } };
-	}
-
-	// If no moves - check if opposing player has moves
-	// If so, run minValue. Else, return a final evaluation
-	if (moves.size() == 0)
-	{
-		if (getMoves(state, true).size() == 0)
-		{
-			_boardsEvaluated++;
-			return { evalBoard(state, false),{ -1, -1 } };
-		}
-		else
-		{
-			return maxValue(state, alpha, beta, depth);
-		}
-	}
-
-	// Else, get the best possible value for a next move
-	int value = INT_MAX;
-	gameMove nextMove = { -1, -1 };
-
-	for (auto it = moves.begin(); it != moves.end(); it++)
-	{
-		// Recursive call
-		valueMove next = maxValue(applyMove(state, *(it), false), alpha, beta, depth + 1);
-
-		if (next.value < value)
-		{
-			value = next.value;
-			nextMove = *(it);
-		}
-
-		// Prune node if value smaller than alpha
-		if (value < alpha)
-			return { value, *(it) };
-
-		// Update beta
-		beta = min(value, beta);
-	}
-
-	return { value, nextMove };
-}
-
-// Returns the next best move given the current state(board)
-gameMove search(board &state)
-{
-	// The MINIMAX algorithm will return this
-	valueMove next;
 
 	// Get next moves for MAX
 	vector<gameMove> moves = getMoves(state, true);
-	// If no moves - return an invalid move
-	if (moves.size() == 0) // No moves for MAX
-	{
-		LOG_WARNING("No moves for MAX(printed black) on board: \n" << printBoard(state, true));
 
-		vector<gameMove> minMoves = getMoves(state, true);
-		
-		// If MIN has move - play MIN
-		if (minMoves.size() == 0)
-		{
-			LOG_WARNING("No moves for MIN(printed white) on board: \n" << printBoard(state, false));
-			return { -1, -1 };
-		}
-		else
-		{
-			// Reset the number of evaluated boards
-			_boardsEvaluated = 0;
-			_maxDepthReached = 0;
-			_entireSpaceCovered = true;
+	// This will also hold the utility values for each possible move
+	vector<valueMove> orderedMoves = vector<valueMove>(moves.size());
 
-			// Run minimax for each move, choose the one with the best utility
-			next = minValue(state, INT_MIN, INT_MAX, 0);
-		}
-	}
-	else
+	if (!isProbe)
 	{
 		// Reset the number of evaluated boards
 		_boardsEvaluated = 0;
 		_maxDepthReached = 0;
 		_entireSpaceCovered = true;
-
-		// Run minimax for each move, choose the one with the best utility
-		next = maxValue(state, INT_MIN, INT_MAX, 0);
 	}
 
-	return next.move;
+	for (int i = 0; i < moves.size(); i++)
+	{
+		orderedMoves[i].move = moves[i];
+		orderedMoves[i].value = -negaMax(state, maxDepth, (SHRT_MAX - 1), (SHRT_MIN + 1), false, isProbe);
+	}
+
+	sort(orderedMoves.begin(), orderedMoves.end(), [](const valueMove &left, const valueMove &right)
+	{
+		return left.value < right.value;
+	});
+
+	for (int i = 0; i < moves.size(); i++)
+	{
+		moves[i] = orderedMoves[i].move;
+	}
+
+	return moves;
 }

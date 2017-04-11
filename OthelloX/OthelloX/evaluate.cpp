@@ -80,7 +80,7 @@ int stableDiscCount(const board &state)
 	return result;
 }
 
-int evalBoard(const board & state, bool max)
+int evalBoard(const board & state)
 {
 	board flippedState = flipAll(state); // Used to calculate values for MIN
 
