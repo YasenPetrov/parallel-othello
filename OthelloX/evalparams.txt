@@ -1,4 +1,4 @@
-MaxDepth: 100	
+MaxDepth: 7
 MaxBoards : 10000000
 ParityWeight : 0.3
 MobilityWeight : 0.4

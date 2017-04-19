@@ -76,11 +76,11 @@ int main(int argc, char** argv)
 				if (isValidMove(flipAll(state), playerMove.y, playerMove.x)) gotValidMove = true;
 				else cout << "Invalid move, try again" << endl;
 			}
-			else cout << "Cannot parse move, try again(lowercase letters, please" << endl;
+			else cout << "Cannot parse move, try again(lowercase letters, please)" << endl;
 		} while (!gotValidMove );
 
 		if(gotValidMove)
-			state = applyMove(state, playerMove, false);
+			state = applyMove(state, playerMove, !_parameters.black);
 
 		cout << printBoard(state, _parameters.black);
 	}

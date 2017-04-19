@@ -71,6 +71,9 @@ bool isValidMove(const board &state, int y, int x)
 {
 	int n = state.size(), m = state[0].size();
 
+	// We cannot put a disc on top of another
+	if (state[y][x] != BRD_FREE) return false;
+
 	// Move in every direction until we're seeing a MIN disc, if we see a MAX disc after we've seen at least one MIN disc, return true
 	for (int i = -1; i <= 1; i++)
 	{
