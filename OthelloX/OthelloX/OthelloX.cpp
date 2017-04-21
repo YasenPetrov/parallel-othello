@@ -52,7 +52,7 @@ int main(int argc, char** argv)
 			return -1;
 		}
 
-		state = applyMove(state, nextMoves[0], _parameters.black);
+		state = applyMove(state, nextMoves[0], true); // The computer player is MAX
 
 		cout << endl << printBoard(state, _parameters.black);
 		cout << "Number of boards assesed: " << _boardsEvaluated << endl;
@@ -80,7 +80,7 @@ int main(int argc, char** argv)
 		} while (!gotValidMove );
 
 		if(gotValidMove)
-			state = applyMove(state, playerMove, !_parameters.black);
+			state = applyMove(state, playerMove, false); // The human player is MIN
 
 		cout << printBoard(state, _parameters.black);
 	}
