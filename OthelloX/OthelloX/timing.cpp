@@ -2,8 +2,11 @@
 #include "stdafx.h"
 #include <chrono>
 
-using namespace chrono;
-using namespace chrono_literals;
+#ifdef __linux__
+	using namespace chrono;
+#elif _WIN32
+	using namespace chrono_literals;
+#endif
 
 static high_resolution_clock::time_point _start;
 static bool _running = false;

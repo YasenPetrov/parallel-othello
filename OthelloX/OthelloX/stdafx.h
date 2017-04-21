@@ -8,7 +8,9 @@
 #define STDAFX_H
 #endif // !STDAFX_H
 
-#include "targetver.h"
+#ifdef _WIN32
+	#include "targetver.h"
+#endif
 
 // Debugging output
 #ifdef _DEBUG
@@ -26,7 +28,9 @@ using namespace std;
 
 // TODO: reference additional headers your program requires here
 #include <stdio.h>
-#include <tchar.h>
+#ifdef _WIN32
+	#include <tchar.h>
+#endif
 #include <vector>
 #include <climits>
 #include <algorithm>

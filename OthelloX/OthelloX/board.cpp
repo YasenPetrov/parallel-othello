@@ -103,7 +103,7 @@ bool isValidMove(const board &state, int y, int x)
 vector<gameMove> getMoves(const board &state, bool max)
 {
 	board brd = state;
-	vector<gameMove> moves;
+	vector<gameMove> moves(0);
 	int n = brd.size(), m = brd[0].size();
 	vector<vector<bool>> visited = vector<vector<bool>>(n, vector<bool>(m, false));
 

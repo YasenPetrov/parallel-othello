@@ -28,7 +28,7 @@ int negaMax(const board &state, short depth, short alpha, short beta, bool maxTu
 		return evalBoard(state);
 	}
 
-	vector<gameMove> moves;
+	vector<gameMove> moves(0);
 
 	if (isProbe)
 	{

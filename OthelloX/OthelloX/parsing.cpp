@@ -97,8 +97,8 @@ bool parseBoardFile(const char * filename, const bool black, board &state)
 			return false;
 		}
 		
-		string param = trim(tokens[0], ' ');
-		string arg = trim(tokens[1], ' ');
+		string param = trim(trim(tokens[0], ' '), '\r');
+		string arg = trim(trim(tokens[1], ' '), '\r');
 
 		// Match the first part against the constants for the parameters, parse the rest
 		if (param.compare(PRS_SIZE) == 0)
@@ -227,8 +227,8 @@ bool parseParamsFile(const char * filename, evalParams &params)
 			return false;
 		}
 
-		string param = trim(tokens[0], ' ');
-		string arg = trim(tokens[1], ' ');
+		string param = trim(trim(tokens[0], '\r'), ' ');
+		string arg = trim(trim(tokens[1], '\r'), ' ');
 
 		// Match the first part against the constants for the parameters, parse the rest
 		if (param.compare(PRS_MAX_BOARDS) == 0)
