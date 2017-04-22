@@ -16,6 +16,7 @@ bool _entireSpaceCovered = true;
 int negaMax(const board &state, short depth, short alpha, short beta, bool maxTurn, bool isProbe)
 {
 	LOG_DEBUG("Negamax, MAX: " << maxTurn << " probe: " << isProbe << " depth: " << depth << " alpha: " << alpha << " beta: " << beta << " board: " << endl << printBoard(state, _parameters.black));
+	cout << "Negamax, MAX: " << maxTurn << " probe: " << isProbe << " depth: " << depth << " alpha: " << alpha << " beta: " << beta << " board: " << endl << printBoard(state, _parameters.black) << endl;
 
 	if (!isProbe && _parameters.maxDepth - depth > _maxDepthReached) _maxDepthReached = _parameters.maxDepth - depth;
 
@@ -129,4 +130,26 @@ vector<gameMove> treeSearch(const board &state, short maxDepth, bool isProbe)
 	}
 
 	return moves;
+}
+
+int slaveSearch(const board &state, short maxDepth, bool isMaxTurn)
+{
+	board stateCopy = board(state);
+
+	// Reset the statistics measures
+	_boardsEvaluated = 0;
+	_maxDepthReached = 0;
+	_entireSpaceCovered = true;
+
+	short alpha = SHRT_MIN + 1;
+    short beta = SHRT_MAX - 1;
+
+    if(isMaxTurn)
+    {
+        return negaMax(stateCopy, maxDepth, alpha, beta, true, false);
+    }
+    else
+    {
+        return -negaMax(stateCopy, maxDepth, -beta, -alpha, false, false);
+    }
 }

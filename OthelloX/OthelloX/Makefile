@@ -1,4 +1,4 @@
-CC=g++
+CC=mpic++
 CXXFLAGS=-I . -Wall -std=c++11 -g
 
 EXEC = othellox

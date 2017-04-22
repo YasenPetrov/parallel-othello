@@ -43,7 +43,7 @@ board applyMove(const board &state, const gameMove &move, bool max)
 			if (i == j && j == 0) continue;
 
 			// If the next disc in the current direction is MIN, we want to check if we have to flip in this direction
-			if (move.y + i >= 0 && move.y + i < M && move.x + j >= 0 && move.x + j < N && result[move.y + i][move.x + j] == BRD_MIN_DISC) maybeFlipInDirection(result, move.y + i, move.x + j, i, j);
+			if (move.y + i >= 0 && move.y + i < N && move.x + j >= 0 && move.x + j < M && result[move.y + i][move.x + j] == BRD_MIN_DISC) maybeFlipInDirection(result, move.y + i, move.x + j, i, j);
 		}
 	}
 	if (!max) return flipAll(result);

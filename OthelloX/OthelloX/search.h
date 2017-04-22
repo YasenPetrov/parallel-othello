@@ -27,3 +27,6 @@ maxDepth - maximmum depth for the search
 isProbe - is this a shallow probe, used to estimate the next best moves
 */
 vector<gameMove> treeSearch(const board &state, short maxDepth, bool isProbe);
+
+
+int slaveSearch(const board &state, short maxDepth, bool isMaxTurn);

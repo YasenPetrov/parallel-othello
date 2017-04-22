@@ -1,5 +1,10 @@
 {
     "files.associations": {
-        "exception": "cpp"
+        "exception": "cpp",
+        "iostream": "cpp",
+        "list": "cpp",
+        "queue": "cpp",
+        "array": "cpp",
+        "*.tcc": "cpp"
     }
 }

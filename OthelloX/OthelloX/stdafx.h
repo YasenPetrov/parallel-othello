@@ -42,3 +42,5 @@ using namespace std;
 #include <random>
 #include <cmath>
 #include <unordered_map>
+#include <mpi.h>
+#include <queue>

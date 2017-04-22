@@ -141,6 +141,8 @@ bool parseBoardFile(const char * filename, const bool black, board &state)
 			string pos;
 			while (getline(iss, pos, ','))
 			{
+				if(pos.compare("") == 0 || pos.compare(" ") == 0)
+					continue;
 				positions.push_back(trim(pos, ' '));
 			}
 
