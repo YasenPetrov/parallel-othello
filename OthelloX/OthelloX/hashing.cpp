@@ -12,13 +12,13 @@ unsigned long long getHash(const board &state)
 	unsigned long long hash = 0ULL;
 
 	// Go over each square and XOR the has with the corresponding random number
-	for (int i = 0; i < state.size(); i++)
+	for (int i = 0; i < _M; i++)
 	{
 		for (int j = 0; j < state[0].size(); j++)
 		{
 			// Values on the board got from -1 to 1, so increment them by 1 to get
 			// the random table row index
-			hash ^= _randomNumbers[state[i][j] + 1][i * state.size() + j];
+			hash ^= _randomNumbers[state[i][j] + 1][i * _M + j];
 		}
 	}
 	

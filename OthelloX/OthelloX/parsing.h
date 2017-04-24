@@ -11,16 +11,19 @@
 #define PRS_SIZE "Size"
 #define PRS_BRD_WHITE "White"
 #define PRS_BRD_BLACK "Black"
+#define PRS_TIMEOUT "Timeout"
+#define PRS_COLOR "Color"
 
 #define PRS_MAX_DEPTH "MaxDepth"
 #define PRS_MAX_BOARDS "MaxBoards"
 #define PRS_PARITY_WEIGHT "ParityWeight"
 #define PRS_MOBILITY_WEIGHT "MobilityWeight"
 #define PRS_STABILITY_WEIGHT "StabilityWeight"
-#define PRS_COLOR "Color"
 #define PRS_COLOR_BLACK "Black"
 #define PRS_COLOR_WHITE "White"
-#define PRS_TIMEOUT "Timeout"
+#define PRS_PRUNING "Prune"
+#define PRS_MOVE_ORDERING "MoveOrdering"
+#define PRS_LOAD_FACTOR "LoadFactor"
 
 /*
 Parse a position(ex: d4) for a board of size NxM
@@ -39,7 +42,7 @@ bool parsePosition(string pos, int &xPos, int &yPos, int N, int M);
 	White : { d4, e5 }
 	Black : { d5, e4 } 
 */
-bool parseBoardFile(const char* filename, const bool black, board &state);
+bool parseBoardFile(const char* filename, board &state, evalParams &params);
 
 // Parse the file, containing the evaluation parameters
 // filename - path to the file, containing the params

@@ -5,7 +5,7 @@
 // We call "stable" discs that cannot be flipped back
 int stableDiscCount(const board &state)
 {
-	int n = state.size(), m = state[0].size();
+	int n = _M, m = _N;
 	vector<vector<bool>> visited = vector<vector<bool>>(n, vector<bool>(m, false));
 	int result = 0;
 
@@ -84,11 +84,6 @@ int evalBoard(const board & state)
 {
 	board flippedState = flipAll(state); // Used to calculate values for MIN
 
-	// Weights for different scores. Best if they sum up to 1
-	float parityWeight = 0.3;
-	float stabilityWeight = 0.4;
-	float mobilityWeight = 0.3;
-
 	int maxDiscs, minDiscs;
 	discCount(state, maxDiscs, minDiscs); // Get the number of discs for each player
 	// Score based on the disc count
@@ -109,9 +104,9 @@ int evalBoard(const board & state)
 		// We add 100 to the result to make sure final evaluations have more weight than
 		// the approximations we make when making a cutoff.
 		if (result > 0)
-			return 100 + result;
+			return 30000 + result;
 		else if (result < 0)
-			return -100 + result;
+			return -30000 + result;
 		else return 0;
 	}
 
@@ -122,7 +117,19 @@ int evalBoard(const board & state)
 	if (maxStableCount + minStableCount != 0)
 		stabilityScore = 100 * (maxStableCount - minStableCount) / ((float)(maxStableCount + minStableCount));
 
+	LOG_DEBUG("======== Evaluating board: \n" << printBoard(state, _parameters.black) << "Scores:"
+					    << "Parity: " << parityScore << endl << "Max stable count: " << maxStableCount << ", MIN stable count: "
+						<< minStableCount << endl << ", Stability: " << stabilityScore << "MAX moves: " << maxMoves 
+						<< ", MIN moves: " << minMoves << endl << ", Mobility: " << mobilityScore << endl
+						<< "Utility: " << _parameters.parityWeight * parityScore + _parameters.stabilityWeight + stabilityScore +
+						_parameters.mobilityWeight * mobilityScore << endl);
 	
 
-	return (int) (parityWeight * parityScore + stabilityWeight + stabilityScore + mobilityWeight * mobilityScore);
+	return _parameters.parityWeight * parityScore + _parameters.stabilityWeight + stabilityScore + _parameters.mobilityWeight * mobilityScore;
+}
+
+int evalBoardStatic(const board &state, int masterId, int slaveCount)
+{
+	int boardSize = _M * _N;
+	int squaresPerSlave = slaveCount / boardSize;
 }

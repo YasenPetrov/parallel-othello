@@ -10,3 +10,5 @@
 // Evaluates a board in an intermediate state
 // max - it is MAX's turn?
 int evalBoard(const board &state);
+
+int evalBoardStatic(const board &state, int masterId, int slaveCount);

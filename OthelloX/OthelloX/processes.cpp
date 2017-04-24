@@ -1,15 +1,6 @@
 #include "processes.h"
 #include "search.h"
-
-#define FLAG_MORE_JOBS_TRUE 1
-#define FLAG_MORE_JOBS_FALSE 0
-
-enum Tags
-{
-    MORE_JOBS,
-    SEARCH_JOB,
-    SEARCH_JOB_RESULT
-};
+#include "timing.h"
 
 /*
 ********* MASTER FUNCTIONS *********
@@ -17,24 +8,57 @@ enum Tags
 
 void masterMain(board initState, int slaveCount)
 {
+    timePoint before, after;
+    timePoint masterStart = timeNow();
+    timePoint masterEnd;
+    long long totalMasterTime = 0;
+    long long totalRecvTime = 0;
+    long long totalSendTime = 0;
+    long long nodeGenerationTime = 0;
+    long long scorePropagationTime = 0;
+
     // Generate some nodes
     vector<stateNode> nodes;
     queue<int> jobQueue;
-    generateNodes(initState, slaveCount * MIN_LOAD_FACTOR, nodes, jobQueue);
+    before = timeNow();
+    generateNodes(initState, slaveCount * _parameters.loadFactor, nodes, jobQueue);
+    after = timeNow();
+    nodeGenerationTime = nsBetween(before, after);
+
     int jobsToComplete = jobQueue.size(); // How many jobs do we have in the pool at the start
-    
-    if(nodes.size() == 1) // We only have the root - we have no possible moves
+    cout << "Job count: " << jobsToComplete << endl;
+    vector<vector<slaveStats>> jobStats(slaveCount, vector<slaveStats>(0)); // Used to store statistics about each job per slave
+
+    // Get the depth of a node at <nodeIdx>
+    auto getDepth = [nodes](int nodeIdx) {
+        if (nodeIdx == 0)
+            return 0;
+        else
+        {
+            int res = 0;
+            while (nodeIdx != 0)
+            {
+                nodeIdx = nodes[nodeIdx].parentIndex;
+                res++;
+            }
+            return res;
+        }
+    };
+
+    if (nodes.size() == 1) // We only have the root - we have no possible moves
     {
         cout << "{ na }";
         // Tell slaves there is no work to do
-        for(int slaveId = 0; slaveId < slaveCount; slaveId++)
+        for (int slaveId = 0; slaveId < slaveCount; slaveId++)
         {
             short workFlag = FLAG_MORE_JOBS_FALSE;
+            before = timeNow();
             MPI_Send(&workFlag, 1, MPI_SHORT, slaveId, Tags::MORE_JOBS, MPI_COMM_WORLD);
+            after = timeNow();
+            totalSendTime += nsBetween(before, after);
         }
         return;
     }
-
 
     // Send a job to each slave
     for (int slaveId = 0; slaveId < slaveCount; slaveId++)
@@ -44,12 +68,15 @@ void masterMain(board initState, int slaveCount)
             int nodeId = jobQueue.front();
             jobQueue.pop();
 
-            sendJob(nodes[nodeId], nodeId, slaveId);
+            totalSendTime += sendJob(nodes[nodeId], nodeId, slaveId, getDepth(nodeId));
         }
         else // If somehow the number of slaves is greater than the pool size, we tell the other slaves there is no work for them
         {
             short workFlag = FLAG_MORE_JOBS_FALSE;
+            before = timeNow();
             MPI_Send(&workFlag, 1, MPI_SHORT, slaveId, Tags::MORE_JOBS, MPI_COMM_WORLD);
+            after = timeNow();
+            totalSendTime += nsBetween(before, after);
         }
     }
 
@@ -58,8 +85,16 @@ void masterMain(board initState, int slaveCount)
     {
         // Wait for a slave to signal it's done, get the result from it
         int slaveId;
+        before = timeNow();
         jobResult result = receiveResult(slaveId);
+        after = timeNow();
+        totalRecvTime += nsBetween(before, after);
         jobsToComplete--;
+
+        // Receive stats
+        slaveStats stats;
+        MPI_Recv(&stats, sizeof(slaveStats), MPI_CHAR, slaveId, Tags::SEARCH_JOB_STATS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        jobStats[slaveId].push_back(stats);
         // cout << "Received a result for job " << result.jobId << " from slave " << slaveId << endl;
 
         // Update the node with the result
@@ -72,17 +107,19 @@ void masterMain(board initState, int slaveCount)
             // Send the slave a job
             int nodeId = jobQueue.front();
             jobQueue.pop();
-            sendJob(nodes[nodeId], nodeId, slaveId);
+            totalSendTime += sendJob(nodes[nodeId], nodeId, slaveId, getDepth(nodeId));
         }
-        else // Otherwise, tell the slave it won't be getting more work
+        else // Otherwise, tell the slave it won't be getting more work and get stats from it
         {
             short workFlag = FLAG_MORE_JOBS_FALSE;
+            before = timeNow();
             MPI_Send(&workFlag, 1, MPI_SHORT, slaveId, Tags::MORE_JOBS, MPI_COMM_WORLD);
+            after = timeNow();
+            totalSendTime += nsBetween(before, after);
         }
     }
 
-    // cout << "Out of jobs" << endl;
-
+    before = timeNow();
     vector<valueMove> rootOrderedMoves;
     // Go through the node list, updating parent nodes' scores
     for (int nodeId = nodes.size() - 1; nodeId > 0; nodeId--)
@@ -101,17 +138,33 @@ void masterMain(board initState, int slaveCount)
         }
     }
 
-    rootOrderedMoves[0].value = 1;
     // What is our best move?
-    sort(rootOrderedMoves.begin(), rootOrderedMoves.end(), [](const valueMove &left, const valueMove &right)
-	{
-		return left.value > right.value; // Sort in descending order
-	});
-    // cout << "Root moves: " << endl;
-    for(valueMove mv : rootOrderedMoves)
+    sort(rootOrderedMoves.begin(), rootOrderedMoves.end(), [](const valueMove &left, const valueMove &right) {
+        return left.value > right.value; // Sort in descending order
+    });
+    after = timeNow();
+    scorePropagationTime = nsBetween(before, after);
+
+    // Time the whole function
+    masterEnd = timeNow();
+    totalMasterTime = nsBetween(masterStart, masterEnd);
+
+    writeStatsToFile(jobStats);
+
+    cout << "---------" << endl;
+    cout << "Master spent " << totalSendTime << " ns sending data" << endl;
+    cout << "Master spent " << totalRecvTime << " ns receiving data" << endl;
+    cout << "Master spent " << nodeGenerationTime << " ns generating nodes" << endl;
+    cout << "Master spent " << scorePropagationTime << " ns propagating scores" << endl;
+    cout << "Master spent " << totalMasterTime << " ns in total" << endl;
+    cout << "Sum of subtimes: " << totalSendTime + totalRecvTime + nodeGenerationTime + scorePropagationTime << " ns" << endl;
+    
+    outputStats(jobStats, totalMasterTime);
+    
+    cout << "Root moves: " << endl;
+    for (valueMove mv : rootOrderedMoves)
     {
-    // cout << (char)(mv.move.x + 'a') << mv.move.y + 1 << " with a score of " << mv.value << endl;
-        
+        cout << (char)(mv.move.x + 'a') << mv.move.y + 1 << " with a score of " << mv.value << endl;
     }
 }
 
@@ -142,9 +195,15 @@ void generateNodes(board initState, int minJobs, vector<stateNode> &nodes, queue
             {
                 noMovesForPrevNode = true;
                 firstWithNoMoves = currentIdx;
+                // Put this node at the back of the queue
+                frontier.pop();
+                frontier.push(currentIdx);
             }
             else if (firstWithNoMoves == currentIdx)
+            {
                 break; // None of the frontier nodes has children
+            }
+                
         }
         else
         {
@@ -161,36 +220,52 @@ void generateNodes(board initState, int minJobs, vector<stateNode> &nodes, queue
 
                 nodes.push_back(newNode);
                 frontier.push(nodes.size() - 1);
+                
             }
         }
     }
 }
 
-void sendJob(stateNode node, int jobId, int slaveId)
+long long sendJob(stateNode node, int jobId, int slaveId, int nodeDepth)
 {
+    timePoint before, after;
+    long long totalTime = 0;
     // Tell the slave it has more work
     short workFlag = FLAG_MORE_JOBS_TRUE;
+    before = timeNow();
     MPI_Send(&workFlag, 1, MPI_SHORT, slaveId, Tags::MORE_JOBS, MPI_COMM_WORLD);
-
+    after = timeNow();
+    totalTime += nsBetween(before, after);
     // Send job ID
     int jIdCopy = jobId;
+    before = timeNow();
     MPI_Send(&jIdCopy, 1, MPI_INT, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
-
-    // Send board dimensions to the slave
-    int M = node.state.size();
-    int N = node.state[0].size();
-    MPI_Send(&M, 1, MPI_INT, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
-    MPI_Send(&N, 1, MPI_INT, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
+    after = timeNow();
+    totalTime += nsBetween(before, after);
 
     // Send each row of the board to the slave
-    for (int row = 0; row < M; row++)
+    before = timeNow();
+    for (int row = 0; row < _M; row++)
     {
-        MPI_Send(&node.state[row].front(), N, MPI_CHAR, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
+        MPI_Send(&node.state[row].front(), _N, MPI_CHAR, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
     }
+    after = timeNow();
+    totalTime += nsBetween(before, after);
 
     // Send the MAX turn flag
     int flag = (int)node.isMaxNode;
+    before = timeNow();
     MPI_Send(&flag, 1, MPI_INT, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
+    after = timeNow();
+    totalTime += nsBetween(before, after);
+
+    // Send the depth
+    before = timeNow();
+    MPI_Send(&nodeDepth, 1, MPI_INT, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
+    after = timeNow();
+    totalTime += nsBetween(before, after);
+
+    return totalTime;
 }
 
 jobResult receiveResult(int &slaveId)
@@ -216,69 +291,96 @@ jobResult receiveResult(int &slaveId)
 
 void slaveMain(int masterId, int slaveId)
 {
+    long long totalRecvTime = 0;
+    long long totalSendTime = 0;
+    long long jobTime = 0;
+    timePoint before, after;
+
     while (true)
     {
         // Will I be receiving a job?
         short willGetJob;
+        timePoint beforeRecv = timeNow();
         MPI_Recv(&willGetJob, 1, MPI_SHORT, masterId, Tags::MORE_JOBS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        // If not, I'm done
+        timePoint afterRecv = timeNow();
+        totalRecvTime += nsBetween(beforeRecv, afterRecv);
+
+        // If not, send stats and I am done
         if (willGetJob == FLAG_MORE_JOBS_FALSE)
+        {
             break;
+        }
 
         // Else, receive job
-        searchJob currentJob = receiveJob(masterId);
+        searchJob currentJob;
+        totalRecvTime += receiveJob(currentJob, masterId);
         // cout << "Slave " << slaveId << " got job " << currentJob.id << " to evaluate for MAX: " << currentJob.isMaxTurn << " with board " << endl
         //      << printBoard(currentJob.state, _parameters.black) << endl;
 
         // Do the job
+        before = timeNow();
         jobResult result = doJob(currentJob);
+        after = timeNow();
+        jobTime = nsBetween(before, after);
 
         // Send the result back to master
+        before = timeNow();
         sendResult(result, masterId);
+        after = timeNow();
+        totalSendTime += nsBetween(before, after);
+
+        // Send stats
+        slaveStats stats;
+        stats.sendTime = totalSendTime;
+        stats.receiveTime = totalRecvTime;
+        stats.jobTime = jobTime;
+        stats.boardsEvaluated = _boardsEvaluated;
+        stats.nodesPruned = _nodesPruned;
+        stats.estMaxDepthPruned = _estMaxDepthPruned;
+        stats.maxDepthReached = _maxDepthReached;
+        stats.entireSpace = _entireSpaceCovered;
+        MPI_Send(&stats, sizeof(stats), MPI_CHAR, masterId, Tags::SEARCH_JOB_STATS, MPI_COMM_WORLD);
     }
 }
 
-searchJob receiveJob(int masterId)
+long long receiveJob(searchJob &job, int masterId)
 {
-    searchJob result;
-
+    timePoint recvStart = timeNow();
     // Get the job ID
-    MPI_Recv(&result.id, 1, MPI_INT, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(&job.id, 1, MPI_INT, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    // Get the board dimensions
-    int M, N;
-    MPI_Recv(&M, 1, MPI_INT, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    MPI_Recv(&N, 1, MPI_INT, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    // Time
+    timePoint recvEnd = timeNow();
 
     // Make a new board
-    result.state = board(M, row(N));
+    job.state = board(_M, row(_N));
 
-    signed char rowBuf[N];
+    signed char rowBuf[_N];
     // Get each row and fill the board
-    for (int rowId = 0; rowId < M; rowId++)
+    for (int rowId = 0; rowId < _M; rowId++)
     {
-        MPI_Recv(rowBuf, N, MPI_CHAR, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        for (int colId = 0; colId < N; colId++)
+        MPI_Recv(rowBuf, _N, MPI_CHAR, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        for (int colId = 0; colId < _N; colId++)
         {
-            result.state[rowId][colId] = rowBuf[colId];
+            job.state[rowId][colId] = rowBuf[colId];
         }
     }
 
     // Receive the MAX turn flag
     int flag;
     MPI_Recv(&flag, 1, MPI_INT, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    result.isMaxTurn = (bool)flag;
+    job.isMaxTurn = (bool)flag;
 
-    return result;
+    // Receive the node depth
+    MPI_Recv(&job.depth, 1, MPI_INT, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    return nsBetween(recvStart, recvEnd);
 }
 
 jobResult doJob(searchJob job)
 {
     jobResult result;
     result.jobId = job.id;
-
-    result.score = slaveSearch(job.state, _parameters.maxDepth, job.isMaxTurn);
-
+    result.score = slaveSearch(job.state, _parameters.maxDepth, job.isMaxTurn, job.depth);
     return result;
 }
 

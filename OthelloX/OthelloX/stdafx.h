@@ -12,6 +12,7 @@
 	#include "targetver.h"
 #endif
 
+// #define _DEBUG
 // Debugging output
 #ifdef _DEBUG
 	#define LOG_DEBUG(x) std::cout << "DEBUG: " << x << std::endl

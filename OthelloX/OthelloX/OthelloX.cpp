@@ -1,5 +1,7 @@
 // OthelloX.cpp : Defines the entry point for the console application.
 //
+#include <sched.h>
+
 
 #include "stdafx.h"
 #include "general.h"
@@ -42,16 +44,14 @@ int main(int argc, char** argv)
 		// Parse the parameters file
 		if (!parseParamsFile(argv[2], _parameters))
 		{
-			LOG_ERR("Error while parsing parameters file:");
-			LOG_ERR(argv[2]);
+			LOG_ERR("Error while parsing parameters file " << argv[2]);
 			MPI_Abort(MPI_COMM_WORLD, -1);
 		}
 
 		// Parse the board file
-		if (!parseBoardFile(argv[1], _parameters.black, state))
+		if (!parseBoardFile(argv[1], state, _parameters))
 		{
-			LOG_ERR("Error whle parsing board file:");
-			LOG_ERR(argv[1]);
+			LOG_ERR("Error whle parsing board file " << argv[1]);
 			MPI_Abort(MPI_COMM_WORLD, -1);
 		}
 	}
@@ -61,7 +61,7 @@ int main(int argc, char** argv)
 	// If we only have one process, do what we would do in serial mode
 	if(slaveCount == 0)
 	{
-		vector<gameMove> nextMoves = treeSearch(state, _parameters.maxDepth, false);
+		vector<gameMove> nextMoves = treeSearch(state, _parameters.maxDepth, false, true); // Play for MAX
 		secondsForSearch = secondsElapsed();
 		
 		if (nextMoves.size() == 0)
@@ -72,26 +72,60 @@ int main(int argc, char** argv)
 
 		state = applyMove(state, nextMoves[0], true); // The computer player is MAX
 
+		// saveBoardToFile(state, "../initialbrd.txt", _parameters.black);
+
 		cout << endl << printBoard(state, _parameters.black);
 		cout << "Number of boards assesed: " << _boardsEvaluated << endl;
+		cout << "Number of nodes pruned: " <<_nodesPruned << endl;
+		cout << "Estimated number of pruned nodes at maxDepth: " << _estMaxDepthPruned << endl;
 		cout << "Depth of boards: " << _maxDepthReached << endl;
 		cout << "Entire space: " << _entireSpaceCovered << endl;
 		cout << "Elapsed time in seconds: " << secondsForSearch << endl;
-		
+		cout << "Boards per second: " << _boardsEvaluated / secondsForSearch << endl;
+
 		MPI_Finalize();
 		return 0;
 	}
 
+
 	// Send the parameters to everyone
-	MPI_Bcast(&_parameters.maxDepth, 1, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
-	MPI_Bcast(&_parameters.maxBoards, 1, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
-	MPI_Bcast(&_parameters.parityWeight, 1, MPI_FLOAT, MASTER_ID, MPI_COMM_WORLD);
-	MPI_Bcast(&_parameters.mobilityWeight, 1, MPI_FLOAT, MASTER_ID, MPI_COMM_WORLD);
-	MPI_Bcast(&_parameters.stabilityWeight, 1, MPI_FLOAT, MASTER_ID, MPI_COMM_WORLD);
-	MPI_Bcast(&_parameters.timeout, 1, MPI_FLOAT, MASTER_ID, MPI_COMM_WORLD);
-	MPI_Bcast(&_parameters.useTranspositionTable, sizeof(bool), MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
-	MPI_Bcast(&_parameters.black, sizeof(bool), MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+	MPI_Bcast(&_parameters, sizeof(_parameters), MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+	MPI_Bcast(&_M, 1, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
+	MPI_Bcast(&_N, 1, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
 	
+	int sc_status;
+	cpu_set_t my_set;
+	unsigned short mask;
+
+	memset(&my_set, 0, sizeof(my_set));
+	CPU_ZERO(&my_set);
+	sc_status = sched_getaffinity(0, sizeof(my_set), &my_set);
+	if (sc_status)
+	{
+		perror("sched_getaffinity");
+		return sc_status;
+	}
+	
+	mask = 0;
+	
+	if (CPU_ISSET(0, &my_set)) mask |= 0x0001;
+	if (CPU_ISSET(1, &my_set)) mask |= 0x0002;
+	if (CPU_ISSET(2, &my_set)) mask |= 0x0004;
+	if (CPU_ISSET(3, &my_set)) mask |= 0x0008;
+	if (CPU_ISSET(4, &my_set)) mask |= 0x0010;
+	if (CPU_ISSET(5, &my_set)) mask |= 0x0020;
+	if (CPU_ISSET(6, &my_set)) mask |= 0x0040;
+	if (CPU_ISSET(7, &my_set)) mask |= 0x0080;
+	if (CPU_ISSET(8, &my_set)) mask |= 0x0100;
+	if (CPU_ISSET(9, &my_set)) mask |= 0x0200;
+	if (CPU_ISSET(10, &my_set)) mask |= 0x0400;
+	if (CPU_ISSET(11, &my_set)) mask |= 0x0800;
+	if (CPU_ISSET(12, &my_set)) mask |= 0x1000;
+	if (CPU_ISSET(13, &my_set)) mask |= 0x2000;
+	if (CPU_ISSET(14, &my_set)) mask |= 0x4000;
+	if (CPU_ISSET(15, &my_set)) mask |= 0x8000;
+	 
+	printf("Process %d is on processor mask 0x%x\n", currentProcId, mask);
 
 	if(currentProcId == MASTER_ID)
 	{
@@ -140,7 +174,7 @@ int main(int argc, char** argv)
 	// 		cout << "Your move(ex: d5): ";
 	// 		cin >> nextPlMoveString;
 	// 		cout << endl;
-	// 		if (parsePosition(nextPlMoveString, playerMove.x, playerMove.y, state.size(), state[0].size()))
+	// 		if (parsePosition(nextPlMoveString, playerMove.x, playerMove.y, _M, state[0].size()))
 	// 		{
 	// 			if (isValidMove(flipAll(state), playerMove.y, playerMove.x)) gotValidMove = true;
 	// 			else cout << "Invalid move, try again" << endl;

@@ -2,15 +2,8 @@
 #include "stdafx.h"
 #include <chrono>
 
-#ifdef __linux__
-	using namespace chrono;
-#elif _WIN32
-	using namespace chrono_literals;
-#endif
-
-static high_resolution_clock::time_point _start;
+static timePoint _start;
 static bool _running = false;
-
 
 void startTimer()
 {
@@ -28,4 +21,27 @@ float secondsElapsed()
 	
 	auto time = high_resolution_clock::now();
 	return duration_cast<duration<float>>(time - _start).count();
+}
+
+long long nsElapsed()
+{
+	if (!_running)
+	{
+		LOG_ERR("Trying to get time when clock not running");
+		return -1;
+	}
+	auto time = high_resolution_clock::now();
+	long long elapsed = duration_cast<nanoseconds>(time - _start).count();
+	return elapsed;
+}
+
+timePoint timeNow()
+{
+	return high_resolution_clock::now();
+}
+
+long long nsBetween(timePoint start, timePoint end)
+{
+	long long elapsed = duration_cast<nanoseconds>(end - start).count();
+	return elapsed;
 }

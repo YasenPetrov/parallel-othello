@@ -1,11 +1,16 @@
 #include "stdafx.h"
 #include "board.h"
 
+#include <assert.h>
+
+// Board height
+int _M;
+// Board width
+int _N;
+
 bool maybeFlipInDirection(board &state, int y, int x, signed char i, signed char j)
 {
-	int n = state.size(), m = state[0].size();
-
-	if (y < 0 || y >= n || x < 0 || x >= m || state[y][x] == BRD_FREE) return false;
+	if (y < 0 || y >= _M || x < 0 || x >= _N || state[y][x] == BRD_FREE) return false;
 	if (state[y][x] == BRD_MAX_DISC) return true;
 
 	// Flip current disc
@@ -24,8 +29,9 @@ bool maybeFlipInDirection(board &state, int y, int x, signed char i, signed char
 
 board applyMove(const board &state, const gameMove &move, bool max)
 {
+	assert(isValidMove(max ? state : flipAll(state), move.y, move.x));
+
 	board result = vector<vector<signed char>>(state);
-	int N = state.size(), M = state[0].size();
 
 	// The resulting board for a MIN move can be obtained by flipping all discs,
 	// making a MAX move and then flipping them all again
@@ -43,7 +49,7 @@ board applyMove(const board &state, const gameMove &move, bool max)
 			if (i == j && j == 0) continue;
 
 			// If the next disc in the current direction is MIN, we want to check if we have to flip in this direction
-			if (move.y + i >= 0 && move.y + i < N && move.x + j >= 0 && move.x + j < M && result[move.y + i][move.x + j] == BRD_MIN_DISC) maybeFlipInDirection(result, move.y + i, move.x + j, i, j);
+			if (move.y + i >= 0 && move.y + i < _M && move.x + j >= 0 && move.x + j < _N && result[move.y + i][move.x + j] == BRD_MIN_DISC) maybeFlipInDirection(result, move.y + i, move.x + j, i, j);
 		}
 	}
 	if (!max) return flipAll(result);
@@ -69,8 +75,6 @@ board flipAll(const board &brd)
 
 bool isValidMove(const board &state, int y, int x)
 {
-	int n = state.size(), m = state[0].size();
-
 	// We cannot put a disc on top of another
 	if (state[y][x] != BRD_FREE) return false;
 
@@ -82,10 +86,10 @@ bool isValidMove(const board &state, int y, int x)
 			// Do not check current square
 			if (i == j && j == 0) continue;
 
-			if (y + i >= 0 && y + i < n && x + j >= 0 && x + j < m && state[y + i][x + j] == BRD_MIN_DISC)
+			if (y + i >= 0 && y + i < _M && x + j >= 0 && x + j < _N && state[y + i][x + j] == BRD_MIN_DISC)
 			{
 				int p = y + 2 * i, q = x + 2 * j;
-				while (p >= 0 && p < n && q >= 0 && q < m)
+				while (p >= 0 && p < _M && q >= 0 && q < _N)
 				{
 					// If we see an empty spot, this is not a valid direction
 					if (state[p][q] == BRD_FREE) break;
@@ -104,15 +108,14 @@ vector<gameMove> getMoves(const board &state, bool max)
 {
 	board brd = state;
 	vector<gameMove> moves(0);
-	int n = brd.size(), m = brd[0].size();
-	vector<vector<bool>> visited = vector<vector<bool>>(n, vector<bool>(m, false));
+	vector<vector<bool>> visited = vector<vector<bool>>(_M, vector<bool>(_N, false));
 
 	// The legal moves for MIN are the same as the legal moves for MAX if all the discs were flipped
 	if (!max) brd = flipAll(state);
 
-	for (int i = 0; i < n; i++)
+	for (int i = 0; i < _M; i++)
 	{
-		for (int j = 0; j < m; j++)
+		for (int j = 0; j < _N; j++)
 		{
 			if (brd[i][j] == BRD_FREE)
 			{
@@ -141,27 +144,23 @@ void discCount(const board & state, int & maxD, int & minD)
 
 string printBoard(const board & state, bool blackIsMax)
 {
-	// Board dimensions
-	int N = state.size();
-	int M = state[0].size();
-
 	stringstream ss;
 
 	// Print the top row(containing letters)
 	ss << "  |";
-	for (int i = 0; i < M; i++)
+	for (int i = 0; i < _N; i++)
 	{
 		ss << " " << (char)('A' + i) << " |";
 	}
 
 	// Print the board, row by row
 	ss << endl;
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < _M; i++)
 	{
 		string del = (i >= 9) ? "" : " ";
 		ss << del << i + 1 << "|";
 
-		for (int j = 0; j < M; j++)
+		for (int j = 0; j < _N; j++)
 		{
 			char toPrint = '-';
 			if (state[i][j] == 1)
@@ -185,10 +184,6 @@ string printBoard(const board & state, bool blackIsMax)
 
 bool saveBoardToFile(const board &state, const char* filename, bool blackIsMax)
 {
-	// Get board dimensions
-	int N = state.size();
-	int M = state[0].size();
-
 	ofstream out(filename, std::ofstream::trunc); // Open and delete contents
 	if (!out)
 	{
@@ -198,16 +193,16 @@ bool saveBoardToFile(const board &state, const char* filename, bool blackIsMax)
 	}
 
 	// Write the size of the board to the file
-	out << PRS_SIZE << " : " << M << ", " << N << endl;
+	out << PRS_SIZE << " : " << _N << ", " << _M << endl;
 
 
 	// Generate strings for the lists of positions of MAX and MIN discs
 	stringstream maxSs, minSs;
 	maxSs << "{ ";
 	minSs << "{ ";
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < _M; i++)
 	{
-		for (int j = 0; j < M; j++)
+		for (int j = 0; j < _N; j++)
 		{
 			if (state[i][j] == BRD_MAX_DISC) maxSs << (char)('a' + j) << i + 1 << ", ";
 			else if (state[i][j] == BRD_MIN_DISC) minSs << (char)('a' + j) << i + 1 << ", ";
@@ -220,14 +215,18 @@ bool saveBoardToFile(const board &state, const char* filename, bool blackIsMax)
 	// Write MAX or MIN positions to black, depending on whether black is max
 	if (blackIsMax)
 	{
-		out << PRS_BRD_BLACK << maxStr << " }" << endl;
-		out << PRS_BRD_WHITE << minStr << " }" << endl;
+		out << PRS_BRD_BLACK << " : " << maxStr << " }" << endl;
+		out << PRS_BRD_WHITE << " : " << minStr << " }" << endl;
 	}
 	else
 	{
-		out << PRS_BRD_BLACK << minStr << " }" << endl;
-		out << PRS_BRD_WHITE << maxStr << " }" << endl;
+		out << PRS_BRD_BLACK << " : " << minStr << " }" << endl;
+		out << PRS_BRD_WHITE << " : " << maxStr << " }" << endl;
 	}
+
+	// Write timeout and color
+	out << PRS_TIMEOUT << " : " << _parameters.timeout << endl;
+	out << PRS_COLOR << " : " << (_parameters.black ? PRS_COLOR_BLACK : PRS_COLOR_WHITE) << endl;
 
 	return true;
 }

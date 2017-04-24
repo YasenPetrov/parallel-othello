@@ -1,10 +1,21 @@
 #include "stdafx.h"
 #include "general.h"
 #include "board.h"
+#include "stats.h"
 
-#define TAG_SEARCH_JOB 1
+#include <iostream>
 
-#define MIN_LOAD_FACTOR 9
+#define FLAG_MORE_JOBS_TRUE 1
+#define FLAG_MORE_JOBS_FALSE 0
+
+enum Tags
+{
+    MORE_JOBS,
+    SEARCH_JOB,
+    SEARCH_JOB_RESULT,
+    SEARCH_JOB_STATS
+};
+
 
 struct stateNode
 {
@@ -21,6 +32,7 @@ struct searchJob
     int id;
     board state;
     bool isMaxTurn;
+    int depth;
 };
 
 struct jobResult
@@ -42,7 +54,7 @@ BFS to generate nodes
 void generateNodes(board initState, int minJobs, vector<stateNode> &nodes, queue<int>&frontier);
 
 // Send a job to process <slaveId>
-void sendJob(stateNode job, int jobId, int slaveId);
+long long sendJob(stateNode job, int jobId, int slaveId, int nodeDepth);
 
 /*
 - Receive job results from a slave
@@ -58,7 +70,7 @@ jobResult receiveResult(int &slaveId);
 void slaveMain(int masterId, int slaveId);
 
 // Receive a job from process <masterId>
-searchJob receiveJob(int masterId);
+long long receiveJob(searchJob &job, int masterId);
 
 // Perfrom a job
 jobResult doJob(searchJob job);
