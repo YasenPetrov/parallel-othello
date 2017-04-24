@@ -24,14 +24,14 @@ int stableDiscCount(const board &state)
 			int i_inc = -1 + 2 * N;
 			int j_inc = -1 + 2 * W;
 
-			if (state[i][j] == BRD_MAX_DISC)
+			if (boardAt(state, i, j) == BRD_MAX_DISC)
 			{
 				visited[i][j] = true;
 				result++;
 
 				// Count the discs on the border row
 				int borderRowCount = 0;
-				while (j < m && j >= 0 && state[i][j] == BRD_MAX_DISC && !visited[i][j])
+				while (j < m && j >= 0 && boardAt(state, i, j) == BRD_MAX_DISC && !visited[i][j])
 				{
 					visited[i][j] = true;
 					borderRowCount++;
@@ -42,7 +42,7 @@ int stableDiscCount(const board &state)
 
 				// Count the discs on the border column
 				int borderColumnCount = 0;
-				while (i < n && i >= 0&& state[i][j] == BRD_MAX_DISC && !visited[i][j])
+				while (i < n && i >= 0 && boardAt(state, i, j) == BRD_MAX_DISC && !visited[i][j])
 				{
 					visited[i][j] = true;
 					borderColumnCount++;
@@ -63,7 +63,7 @@ int stableDiscCount(const board &state)
 					// Count the disks on this row. Cannot be more than the last row count - 
 					// any discs beyoud that won't be stable
 					int thisRowCount = 1;
-					while (thisRowCount < lastRowCount && state[i][j] == BRD_MAX_DISC && !visited[i][j])
+					while (thisRowCount < lastRowCount && boardAt(state, i, j) == BRD_MAX_DISC && !visited[i][j])
 					{
 						visited[i][j] = true;
 						thisRowCount++;

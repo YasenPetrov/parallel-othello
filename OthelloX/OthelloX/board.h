@@ -32,6 +32,12 @@ vector<gameMove> getMoves(const board &state, bool max);
 // Store the number of MAX and min discs in maxD and minD, respectively
 void discCount(const board &state, int &maxD, int &minD);
 
+// Return the value of the board at <x, y>
+piece boardAt(const board &state, int x, int y);
+
+// Set state[y][x] to <value>
+void boardAssign(board &state, int x, int y, piece value);
+
 // Print the board on the terminal
 string printBoard(const board &state, bool blackIsMax);
 

@@ -10,16 +10,16 @@ int _N;
 
 bool maybeFlipInDirection(board &state, int y, int x, signed char i, signed char j)
 {
-	if (y < 0 || y >= _M || x < 0 || x >= _N || state[y][x] == BRD_FREE) return false;
-	if (state[y][x] == BRD_MAX_DISC) return true;
+	if (y < 0 || y >= _M || x < 0 || x >= _N || boardAt(state, y, x) == BRD_FREE) return false;
+	if (boardAt(state, y, x) == BRD_MAX_DISC) return true;
 
 	// Flip current disc
-	state[y][x] = BRD_MAX_DISC;
+	boardAssign(state, y, x, BRD_MAX_DISC);
 	// If it turns out we don't have to flip discs in this direction, flip it back
 	bool haveToFlip = maybeFlipInDirection(state, y + i, x + j, i, j);
 	if (!haveToFlip)
 	{
-		state[y][x] = BRD_MIN_DISC;
+		boardAssign(state, y, x, BRD_MIN_DISC);
 		return false;
 	}
 
@@ -38,7 +38,7 @@ board applyMove(const board &state, const gameMove &move, bool max)
 	if (!max) result = flipAll(result);
 	
 	// Put disc down
-	result[move.y][move.x] = BRD_MAX_DISC;
+	boardAssign(result, move.y, move.x, BRD_MAX_DISC);
 
 	// Check all 8 directions
 	for (int i = -1; i <= 1; i++)
@@ -49,7 +49,7 @@ board applyMove(const board &state, const gameMove &move, bool max)
 			if (i == j && j == 0) continue;
 
 			// If the next disc in the current direction is MIN, we want to check if we have to flip in this direction
-			if (move.y + i >= 0 && move.y + i < _M && move.x + j >= 0 && move.x + j < _N && result[move.y + i][move.x + j] == BRD_MIN_DISC) maybeFlipInDirection(result, move.y + i, move.x + j, i, j);
+			if (move.y + i >= 0 && move.y + i < _M && move.x + j >= 0 && move.x + j < _N && boardAt(result, move.y + i, move.x + j) == BRD_MIN_DISC) maybeFlipInDirection(result, move.y + i, move.x + j, i, j);
 		}
 	}
 	if (!max) return flipAll(result);
@@ -66,7 +66,7 @@ board flipAll(const board &brd)
 	{
 		for (int j = 0; j < brd[0].size(); j++)
 		{
-			result[i][j] = -brd[i][j];
+			boardAssign(result, i, j, -boardAt(brd, i, j));
 		}
 	}
 
@@ -76,7 +76,7 @@ board flipAll(const board &brd)
 bool isValidMove(const board &state, int y, int x)
 {
 	// We cannot put a disc on top of another
-	if (state[y][x] != BRD_FREE) return false;
+	if (boardAt(state, y, x) != BRD_FREE) return false;
 
 	// Move in every direction until we're seeing a MIN disc, if we see a MAX disc after we've seen at least one MIN disc, return true
 	for (int i = -1; i <= 1; i++)
@@ -86,14 +86,14 @@ bool isValidMove(const board &state, int y, int x)
 			// Do not check current square
 			if (i == j && j == 0) continue;
 
-			if (y + i >= 0 && y + i < _M && x + j >= 0 && x + j < _N && state[y + i][x + j] == BRD_MIN_DISC)
+			if (y + i >= 0 && y + i < _M && x + j >= 0 && x + j < _N && boardAt(state, y + i, x + j) == BRD_MIN_DISC)
 			{
 				int p = y + 2 * i, q = x + 2 * j;
 				while (p >= 0 && p < _M && q >= 0 && q < _N)
 				{
 					// If we see an empty spot, this is not a valid direction
-					if (state[p][q] == BRD_FREE) break;
-					if (state[p][q] == BRD_MAX_DISC) return true;
+					if (boardAt(state, p, q) == BRD_FREE) break;
+					if (boardAt(state, p, q) == BRD_MAX_DISC) return true;
 					p += i;
 					q += j;
 				}
@@ -117,7 +117,7 @@ vector<gameMove> getMoves(const board &state, bool max)
 	{
 		for (int j = 0; j < _N; j++)
 		{
-			if (brd[i][j] == BRD_FREE)
+			if (boardAt(brd, i, j) == BRD_FREE)
 			{
 				if (isValidMove(brd, i, j)) moves.push_back({ j, i });
 			}
@@ -142,6 +142,17 @@ void discCount(const board & state, int & maxD, int & minD)
 	}
 }
 
+piece boardAt(const board &state, int y, int x)
+{
+	return state[y][x];
+}
+
+void boardAssign(board &state, int y, int x, piece value)
+{
+	state[y][x] = value;
+}
+
+
 string printBoard(const board & state, bool blackIsMax)
 {
 	stringstream ss;
@@ -163,12 +174,12 @@ string printBoard(const board & state, bool blackIsMax)
 		for (int j = 0; j < _N; j++)
 		{
 			char toPrint = '-';
-			if (state[i][j] == 1)
+			if (boardAt(state, i, j) == 1)
 			{
 				if (blackIsMax) toPrint = 'B';
 				else toPrint = 'W';
 			}
-			if (state[i][j] == -1)
+			if (boardAt(state, i, j) == -1)
 			{
 				if (blackIsMax) toPrint = 'W';
 				else toPrint = 'B';
@@ -204,8 +215,8 @@ bool saveBoardToFile(const board &state, const char* filename, bool blackIsMax)
 	{
 		for (int j = 0; j < _N; j++)
 		{
-			if (state[i][j] == BRD_MAX_DISC) maxSs << (char)('a' + j) << i + 1 << ", ";
-			else if (state[i][j] == BRD_MIN_DISC) minSs << (char)('a' + j) << i + 1 << ", ";
+			if (boardAt(state, i, j) == BRD_MAX_DISC) maxSs << (char)('a' + j) << i + 1 << ", ";
+			else if (boardAt(state, i, j) == BRD_MIN_DISC) minSs << (char)('a' + j) << i + 1 << ", ";
 		}
 	}
 

@@ -174,7 +174,7 @@ int main(int argc, char** argv)
 	// 		cout << "Your move(ex: d5): ";
 	// 		cin >> nextPlMoveString;
 	// 		cout << endl;
-	// 		if (parsePosition(nextPlMoveString, playerMove.x, playerMove.y, _M, state[0].size()))
+	// 		if (parsePosition(nextPlMoveString, playerMove.x, playerMove.y, _M, _N)))
 	// 		{
 	// 			if (isValidMove(flipAll(state), playerMove.y, playerMove.x)) gotValidMove = true;
 	// 			else cout << "Invalid move, try again" << endl;
