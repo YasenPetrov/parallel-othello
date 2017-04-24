@@ -229,39 +229,27 @@ void generateNodes(board initState, int minJobs, vector<stateNode> &nodes, queue
 long long sendJob(stateNode node, int jobId, int slaveId, int nodeDepth)
 {
     timePoint before, after;
+    before = timeNow();
     long long totalTime = 0;
     // Tell the slave it has more work
     short workFlag = FLAG_MORE_JOBS_TRUE;
-    before = timeNow();
     MPI_Send(&workFlag, 1, MPI_SHORT, slaveId, Tags::MORE_JOBS, MPI_COMM_WORLD);
-    after = timeNow();
-    totalTime += nsBetween(before, after);
+
     // Send job ID
     int jIdCopy = jobId;
-    before = timeNow();
     MPI_Send(&jIdCopy, 1, MPI_INT, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
-    after = timeNow();
-    totalTime += nsBetween(before, after);
 
-    // Send each row of the board to the slave
-    before = timeNow();
-    for (int row = 0; row < _M; row++)
-    {
-        MPI_Send(&node.state[row].front(), _N, MPI_CHAR, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
-    }
-    after = timeNow();
-    totalTime += nsBetween(before, after);
+    // Send the board to the slave
+    MPI_Send(&node.state.front(), _N * _M, MPI_CHAR, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
 
     // Send the MAX turn flag
     int flag = (int)node.isMaxNode;
-    before = timeNow();
     MPI_Send(&flag, 1, MPI_INT, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
-    after = timeNow();
-    totalTime += nsBetween(before, after);
 
     // Send the depth
-    before = timeNow();
     MPI_Send(&nodeDepth, 1, MPI_INT, slaveId, Tags::SEARCH_JOB, MPI_COMM_WORLD);
+    
+    // Time
     after = timeNow();
     totalTime += nsBetween(before, after);
 
@@ -349,22 +337,11 @@ long long receiveJob(searchJob &job, int masterId)
     // Get the job ID
     MPI_Recv(&job.id, 1, MPI_INT, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-    // Time
-    timePoint recvEnd = timeNow();
-
     // Make a new board
-    job.state = board(_M, row(_N));
+    job.state = board(_M * _N);
 
-    signed char rowBuf[_N];
-    // Get each row and fill the board
-    for (int rowId = 0; rowId < _M; rowId++)
-    {
-        MPI_Recv(rowBuf, _N, MPI_CHAR, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        for (int colId = 0; colId < _N; colId++)
-        {
-            job.state[rowId][colId] = rowBuf[colId];
-        }
-    }
+    // Get the board
+    MPI_Recv(&job.state.front(), _N * _M, MPI_CHAR, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     // Receive the MAX turn flag
     int flag;
@@ -373,6 +350,9 @@ long long receiveJob(searchJob &job, int masterId)
 
     // Receive the node depth
     MPI_Recv(&job.depth, 1, MPI_INT, masterId, Tags::SEARCH_JOB, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    // Time
+    timePoint recvEnd = timeNow();
     return nsBetween(recvStart, recvEnd);
 }
 

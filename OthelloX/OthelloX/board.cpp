@@ -31,7 +31,7 @@ board applyMove(const board &state, const gameMove &move, bool max)
 {
 	assert(isValidMove(max ? state : flipAll(state), move.y, move.x));
 
-	board result = vector<vector<signed char>>(state);
+	board result = board(state);
 
 	// The resulting board for a MIN move can be obtained by flipping all discs,
 	// making a MAX move and then flipping them all again
@@ -59,12 +59,12 @@ board applyMove(const board &state, const gameMove &move, bool max)
 board flipAll(const board &brd)
 {
 	// The resulting board - fill with 0s
-	board result = board(brd.size(), row(brd[0].size(), 0));
+	board result = board(_N * _M, 0);
 
 	// If we see a disc, flip it
-	for (int i = 0; i < brd.size(); i++)
+	for (int i = 0; i < _M; i++)
 	{
-		for (int j = 0; j < brd[0].size(); j++)
+		for (int j = 0; j < _N; j++)
 		{
 			boardAssign(result, i, j, -boardAt(brd, i, j));
 		}
@@ -132,26 +132,32 @@ void discCount(const board & state, int & maxD, int & minD)
 	maxD = 0;
 	minD = 0;
 
-	for (auto it_o = state.begin(); it_o != state.end(); it_o++)
+	for(int i = 0; i < _M; i++)
 	{
-		for (auto it_i = it_o->begin(); it_i != it_o->end(); it_i++)
+		for(int j = 0; j < _N; j++)
 		{
-			if (*(it_i) == BRD_MAX_DISC) maxD++;
-			else if (*(it_i) == BRD_MIN_DISC) minD++;
+			if(boardAt(state, i, j) == BRD_MAX_DISC) maxD++;
+			else if(boardAt(state, i, j) == BRD_MIN_DISC) minD++;
 		}
 	}
 }
 
 piece boardAt(const board &state, int y, int x)
 {
-	return state[y][x];
+	return state[_N * y + x];
+	// return state[y][x];
 }
 
 void boardAssign(board &state, int y, int x, piece value)
 {
-	state[y][x] = value;
+	state[_N * y + x] = value;
+	// state[y][x] = value;
 }
 
+void makeEmptyBoard(board &state)
+{
+	state = board(_N * _M, BRD_FREE);
+}
 
 string printBoard(const board & state, bool blackIsMax)
 {

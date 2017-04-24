@@ -36,7 +36,7 @@ bool parsePosition(string pos, int &xPos, int &yPos, int N, int M)
 bool fillPositions(const vector<string> positions, board &state, bool max)
 {
 	// Fill with 1 or -1 depending on whether these are MAX or MIN discs
-	signed char disc = max ? 1 : -1;
+	signed char disc = max ? BRD_MAX_DISC : BRD_MIN_DISC;
 
 	// Parse all positions and mark them on the board
 	for (auto it = positions.begin(); it != positions.end(); it++)
@@ -44,8 +44,10 @@ bool fillPositions(const vector<string> positions, board &state, bool max)
 		int xPos, yPos;
 
 		if (!parsePosition(*it, xPos, yPos, _M, _N)) return false;
-
-		state[yPos][xPos] = disc;
+		
+		cout << yPos << " " << xPos << " " << (int)disc << endl;
+		boardAssign(state, yPos, xPos, disc);
+		cout << printBoard(state, true);
 	}
 
 	return true;
@@ -109,7 +111,7 @@ bool parseBoardFile(const char * filename, board &state, evalParams &params)
 
 
 				// Initialise board with zeros
-				state = board(_M, vector<signed char>(_N, 0));
+				state = board(_M * _N, 0);
 
 				gotBoardSize = true;
 			}

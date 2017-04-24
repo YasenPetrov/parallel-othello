@@ -62,5 +62,5 @@ struct gameMove
 // 1 -	square, occupied by MAX
 // -1  - square occupied by MIN
 typedef signed char piece;
-typedef vector<piece> row;
-typedef vector<row> board;
+// typedef vector<piece> row;
+typedef vector<piece> board;

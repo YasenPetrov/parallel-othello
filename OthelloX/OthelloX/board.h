@@ -38,6 +38,9 @@ piece boardAt(const board &state, int x, int y);
 // Set state[y][x] to <value>
 void boardAssign(board &state, int x, int y, piece value);
 
+// Set state to an empty board
+void makeEmptyBoard(board &state);
+
 // Print the board on the terminal
 string printBoard(const board &state, bool blackIsMax);
 

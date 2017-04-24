@@ -61,6 +61,8 @@ int main(int argc, char** argv)
 	// If we only have one process, do what we would do in serial mode
 	if(slaveCount == 0)
 	{
+		cout << endl << printBoard(state, _parameters.black);
+		
 		vector<gameMove> nextMoves = treeSearch(state, _parameters.maxDepth, false, true); // Play for MAX
 		secondsForSearch = secondsElapsed();
 		
@@ -71,7 +73,7 @@ int main(int argc, char** argv)
 		}
 
 		state = applyMove(state, nextMoves[0], true); // The computer player is MAX
-
+		
 		// saveBoardToFile(state, "../initialbrd.txt", _parameters.black);
 
 		cout << endl << printBoard(state, _parameters.black);
