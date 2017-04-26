@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "search.h"
 
-#define MOVE_ORDER_SEARCH_DEPTH 1
+#define MOVE_ORDER_SEARCH_DEPTH 2
 #define AVG_BRANCH_FACTOR 7
 
 // The parameters for searching
@@ -174,10 +174,10 @@ int slaveSearch(const board &state, short maxDepth, bool isMaxTurn, int currentD
 
     if(isMaxTurn)
     {
-        return negaMax(stateCopy, maxDepth - currentDepth, alpha, beta, true, false);
+        return negaMax(stateCopy, maxDepth - currentDepth, alpha, beta, isMaxTurn, false);
     }
     else
     {
-        return -negaMax(stateCopy, maxDepth - currentDepth, -beta, -alpha, false, false);
+        return -negaMax(stateCopy, maxDepth - currentDepth, -beta, -alpha, isMaxTurn, false);
     }
 }

@@ -1,5 +1,5 @@
 Size : 7, 8
-White : { d4, d5 }
-Black : { c2, d3, e4, f4, g4, e5, f5, d6, e6, e7 }
+White : { d4, e5 }
+Black : { e4, d5 }
 Timeout : 60
 Color : Black

@@ -21,9 +21,11 @@
 #define PRS_STABILITY_WEIGHT "StabilityWeight"
 #define PRS_COLOR_BLACK "Black"
 #define PRS_COLOR_WHITE "White"
-#define PRS_PRUNING "Prune"
-#define PRS_MOVE_ORDERING "MoveOrdering"
-#define PRS_LOAD_FACTOR "LoadFactor"
+#define PRS_PRUNING "Prune" 					// 0 or 1
+#define PRS_MOVE_ORDERING "MoveOrdering"		// 0 or 1
+#define PRS_LOAD_FACTOR "LoadFactor" 			// integer
+#define PRS_STATIC_EVAL "StaticEvaluation" 		// 0 or 1
+#define PRS_PARALLEL_SEARCH "ParallelSearch"	// 0 or 1
 
 /*
 Parse a position(ex: d4) for a board of size NxM

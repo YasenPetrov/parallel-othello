@@ -35,8 +35,14 @@ void discCount(const board &state, int &maxD, int &minD);
 // Return the value of the board at <x, y>
 piece boardAt(const board &state, int x, int y);
 
+// 1D version of the above
+piece boardAt(const board &state, int index);
+
 // Set state[y][x] to <value>
 void boardAssign(board &state, int x, int y, piece value);
+
+// 1D version of the above
+void boardAssign(board &state, int index, piece value);
 
 // Set state to an empty board
 void makeEmptyBoard(board &state);

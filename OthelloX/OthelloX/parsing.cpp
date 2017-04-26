@@ -45,9 +45,7 @@ bool fillPositions(const vector<string> positions, board &state, bool max)
 
 		if (!parsePosition(*it, xPos, yPos, _M, _N)) return false;
 		
-		cout << yPos << " " << xPos << " " << (int)disc << endl;
 		boardAssign(state, yPos, xPos, disc);
-		cout << printBoard(state, true);
 	}
 
 	return true;
@@ -363,6 +361,30 @@ bool parseParamsFile(const char * filename, evalParams &params)
 			catch (const std::exception&)
 			{
 				LOG_ERR("Bad argument for load factor: " << arg);
+				return false;
+			}
+		}
+		else if (param.compare(PRS_STATIC_EVAL) == 0)
+		{
+			try
+			{
+				params.useStaticEvaluation = (bool) stoi(arg);
+			}
+			catch (const std::exception&)
+			{
+				LOG_ERR("Bad argument for static evaluation(specify 0 or 1): " << arg);
+				return false;
+			}
+		}
+		else if (param.compare(PRS_PARALLEL_SEARCH) == 0)
+		{
+			try
+			{
+				params.parallelSearch = (bool) stoi(arg);
+			}
+			catch (const std::exception&)
+			{
+				LOG_ERR("Bad argument for parallel search(specify 0 or 1): " << arg);
 				return false;
 			}
 		}

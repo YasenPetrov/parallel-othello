@@ -2,7 +2,6 @@
 //
 #include <sched.h>
 
-
 #include "stdafx.h"
 #include "general.h"
 #include "board.h"
@@ -11,8 +10,14 @@
 #include "timing.h"
 #include "processes.h"
 
-// The slaves are processes 0 to (N-2) and process (N-1) is the master
-#define MASTER_ID slaveCount
+int _currentProcId = -1;
+int _slaveCount = -1;
+int _squaresPerProc;
+int _remainderSquares;
+board _sharedBoard;
+vector<piece> _subScores;
+int *_sendCounts;
+int *_displacements;
 
 int main(int argc, char** argv)
 {
@@ -23,17 +28,16 @@ int main(int argc, char** argv)
 	MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
 
 	// One master, N - 1 slaves
-	int slaveCount = worldSize - 1;
+	_slaveCount = worldSize - 1;
 
 	// Who am I?(And who are you? Who, who... who, who..)
-	int currentProcId;
-	MPI_Comm_rank(MPI_COMM_WORLD, &currentProcId); // Tell me who are YOU?
+	MPI_Comm_rank(MPI_COMM_WORLD, &_currentProcId); // Tell me who are YOU?
 
 	board state;	// Our game board
 	float secondsForSearch;	// Store the fime for each search
 
 	// Parse the arguments in the master process
-	if(currentProcId == MASTER_ID)
+	if(_currentProcId == MASTER_ID)
 	{
 		if (argc < 3)
 		{
@@ -56,44 +60,84 @@ int main(int argc, char** argv)
 		}
 	}
 
-	startTimer();
-
-	// If we only have one process, do what we would do in serial mode
-	if(slaveCount == 0)
-	{
-		cout << endl << printBoard(state, _parameters.black);
-		
-		vector<gameMove> nextMoves = treeSearch(state, _parameters.maxDepth, false, true); // Play for MAX
-		secondsForSearch = secondsElapsed();
-		
-		if (nextMoves.size() == 0)
-		{
-			LOG_ERR("Search did not produce a valid move");
-			return -1;
-		}
-
-		state = applyMove(state, nextMoves[0], true); // The computer player is MAX
-		
-		// saveBoardToFile(state, "../initialbrd.txt", _parameters.black);
-
-		cout << endl << printBoard(state, _parameters.black);
-		cout << "Number of boards assesed: " << _boardsEvaluated << endl;
-		cout << "Number of nodes pruned: " <<_nodesPruned << endl;
-		cout << "Estimated number of pruned nodes at maxDepth: " << _estMaxDepthPruned << endl;
-		cout << "Depth of boards: " << _maxDepthReached << endl;
-		cout << "Entire space: " << _entireSpaceCovered << endl;
-		cout << "Elapsed time in seconds: " << secondsForSearch << endl;
-		cout << "Boards per second: " << _boardsEvaluated / secondsForSearch << endl;
-
-		MPI_Finalize();
-		return 0;
-	}
-
-
 	// Send the parameters to everyone
 	MPI_Bcast(&_parameters, sizeof(_parameters), MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
 	MPI_Bcast(&_M, 1, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
 	MPI_Bcast(&_N, 1, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
+
+	// Maybe initialize weights for static evaluation
+	if(_parameters.useStaticEvaluation)
+	{
+		_squareWeights = board(_N * _M);
+		fillWeightsMatrix(_squareWeights);
+		if(_slaveCount > 0)
+		{
+			_squaresPerProc = (_N * _M) / worldSize;
+			_remainderSquares = (_N * _M) % worldSize;
+			_sharedBoard = board(_N * _M, 0);
+			_subScores = vector<piece>(worldSize, 0);
+			_sendCounts = new int[worldSize];
+			_displacements = new int[worldSize];
+			int nextSquareIndex = 0; // Displacement
+			int procsWithExtraSquare = _remainderSquares;
+			for(int procId = 0; procId < worldSize; procId++)
+			{
+				// If boardSize & slaveCount = r, the next line ensures that the first r processes get 1 more square than the rest
+				_sendCounts[procId] = (procsWithExtraSquare-- > 0 ? _squaresPerProc + 1 : _squaresPerProc);
+				_displacements[procId] = nextSquareIndex;
+				nextSquareIndex += _sendCounts[procId];
+			}
+		}
+	}
+
+	startTimer();
+
+	// If we only have one process or we've switched parallel search off, do what we would do in serial mode
+	if(_slaveCount < 2 || !_parameters.parallelSearch)
+	{
+		if(_currentProcId != MASTER_ID)
+		{
+			if(_parameters.parallelSearch) // If we want to do parallel search but we have only one slave, kill it an let the master do the work
+			{
+				MPI_Finalize();
+				return 0;
+			}
+		}
+		else // This is the master process
+		{
+			cout << "Running search.." << endl;
+			_parameters.parallelSearch = false;
+			vector<gameMove> nextMoves = treeSearch(state, _parameters.maxDepth, false, true); // Play for MAX
+			secondsForSearch = secondsElapsed();
+			
+			if (nextMoves.size() == 0)
+			{
+				LOG_ERR("Search did not produce a valid move");
+				return -1;
+			}
+
+			state = applyMove(state, nextMoves[0], true); // The computer player is MAX
+			
+			// saveBoardToFile(state, "../initialbrd.txt", _parameters.black);
+
+			cout << endl << printBoard(state, _parameters.black);
+			cout << "Number of boards assesed: " << _boardsEvaluated << endl;
+			cout << "Number of nodes pruned: " <<_nodesPruned << endl;
+			cout << "Estimated number of pruned nodes at maxDepth: " << _estMaxDepthPruned << endl;
+			cout << "Depth of boards: " << _maxDepthReached << endl;
+			cout << "Entire space: " << _entireSpaceCovered << endl;
+			cout << "Elapsed time in seconds: " << secondsForSearch << endl;
+			cout << "Boards per second: " << _boardsEvaluated / secondsForSearch << endl;
+
+			// If we have slaves, tell them they'll get no more work
+			int8_t moreWork = false;
+			MPI_Bcast(&moreWork, 1, MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+
+			MPI_Finalize();
+			return 0;
+		}
+	}
+
 	
 	int sc_status;
 	cpu_set_t my_set;
@@ -127,17 +171,25 @@ int main(int argc, char** argv)
 	if (CPU_ISSET(14, &my_set)) mask |= 0x4000;
 	if (CPU_ISSET(15, &my_set)) mask |= 0x8000;
 	 
-	printf("Process %d is on processor mask 0x%x\n", currentProcId, mask);
+	printf("Process %d is on processor mask 0x%x\n", _currentProcId, mask);
 
-	if(currentProcId == MASTER_ID)
+	if(_currentProcId == MASTER_ID)
 	{
-		cout << "Master: " << currentProcId << endl;
-		masterMain(state, slaveCount);
+		cout << "Master: " << _currentProcId  << " will run parallel search" << endl;
+		masterMain(state, _slaveCount);
 	}
 	else
 	{
-		cout << "Slave: " << currentProcId << endl;		
-		slaveMain(MASTER_ID, currentProcId);
+		if(!_parameters.parallelSearch)
+		{
+			cout << "Slave: " << _currentProcId << " will run parallel evaluation" << endl;					
+			slaveBoardEval();
+		}
+		else
+		{
+			cout << "Slave: " << _currentProcId << " will run parallel search" << endl;		
+			slaveMain(MASTER_ID, _currentProcId);
+		}
 	}
 
 	

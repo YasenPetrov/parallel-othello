@@ -25,6 +25,11 @@ void masterMain(board initState, int slaveCount)
     after = timeNow();
     nodeGenerationTime = nsBetween(before, after);
 
+    for(stateNode n: nodes)
+    {
+        cout << "==========\n" << printBoard(n.state, true);
+    }
+
     int jobsToComplete = jobQueue.size(); // How many jobs do we have in the pool at the start
     cout << "Job count: " << jobsToComplete << endl;
     vector<vector<slaveStats>> jobStats(slaveCount, vector<slaveStats>(0)); // Used to store statistics about each job per slave
@@ -86,7 +91,7 @@ void masterMain(board initState, int slaveCount)
         // Wait for a slave to signal it's done, get the result from it
         int slaveId;
         before = timeNow();
-        jobResult result = receiveResult(slaveId);
+        jobResult result = receiveResult(slaveId); // Get result
         after = timeNow();
         totalRecvTime += nsBetween(before, after);
         jobsToComplete--;
@@ -95,11 +100,9 @@ void masterMain(board initState, int slaveCount)
         slaveStats stats;
         MPI_Recv(&stats, sizeof(slaveStats), MPI_CHAR, slaveId, Tags::SEARCH_JOB_STATS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         jobStats[slaveId].push_back(stats);
-        // cout << "Received a result for job " << result.jobId << " from slave " << slaveId << endl;
 
         // Update the node with the result
-        if (result.score > nodes[result.jobId].bestScore)
-            nodes[result.jobId].bestScore = result.score;
+        nodes[result.jobId].bestScore = result.score;
 
         if (jobQueue.size() > 0) // If we have more jobs send one to the slave that just completed a job
         {
@@ -125,10 +128,10 @@ void masterMain(board initState, int slaveCount)
     for (int nodeId = nodes.size() - 1; nodeId > 0; nodeId--)
     {
         stateNode currentNode = nodes[nodeId];
-        if (currentNode.bestScore > nodes[currentNode.parentIndex].bestScore)
-        {
+        if (!currentNode.isMaxNode && currentNode.bestScore > nodes[currentNode.parentIndex].bestScore)
             nodes[currentNode.parentIndex].bestScore = currentNode.bestScore;
-        }
+        else if(currentNode.isMaxNode && currentNode.bestScore < nodes[currentNode.parentIndex].bestScore)
+            nodes[currentNode.parentIndex].bestScore = currentNode.bestScore;
         if (currentNode.parentIndex == 0) // This is a lvl 1 node
         {
             valueMove mv;
@@ -214,9 +217,9 @@ void generateNodes(board initState, int minJobs, vector<stateNode> &nodes, queue
                 stateNode newNode;
                 newNode.state = applyMove(nodes[currentIdx].state, mv, nodes[currentIdx].isMaxNode);
                 newNode.parentIndex = currentIdx;
-                newNode.bestScore = INT_MIN;
                 newNode.generatingMove = mv;
                 newNode.isMaxNode = !nodes[currentIdx].isMaxNode;
+                newNode.bestScore = newNode.isMaxNode ? INT_MIN : INT_MAX;
 
                 nodes.push_back(newNode);
                 frontier.push(nodes.size() - 1);
@@ -373,4 +376,31 @@ void sendResult(jobResult result, int masterId)
 
     // Send the array
     MPI_Send(resArray, 2, MPI_INT, masterId, Tags::SEARCH_JOB_RESULT, MPI_COMM_WORLD);
+}
+
+void slaveBoardEval()
+{
+    piece *block = new piece[_squaresPerProc + 1];
+    while(true)
+    {
+        // Do we have more work?
+        int8_t moreWork;
+        MPI_Bcast(&moreWork, 1, MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+        if(!(bool)moreWork)
+        {
+            delete [] block;
+            return;
+        }        
+        // Receive data
+        MPI_Scatterv(NULL, NULL, NULL, MPI_BYTE, block, _sendCounts[_currentProcId], MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+        // Calculate subscore
+        int subScore = 0;
+        for(int i = 0; i < _sendCounts[_currentProcId]; i++)
+        {
+            subScore += block[i] * _squareWeights[_displacements[_currentProcId] + i];
+        }
+        // Send data back to be aggregated
+        MPI_Reduce(&subScore, NULL, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);
+    }
+    delete [] block;
 }

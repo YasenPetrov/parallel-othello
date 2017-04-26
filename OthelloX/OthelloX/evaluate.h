@@ -11,4 +11,5 @@
 // max - it is MAX's turn?
 int evalBoard(const board &state);
 
-int evalBoardStatic(const board &state, int masterId, int slaveCount);
+// Generate coefficient matrix
+void fillWeightsMatrix(board &matrix);

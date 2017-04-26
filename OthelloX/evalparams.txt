@@ -1,4 +1,4 @@
-MaxDepth: 9
+MaxDepth: 8
 MaxBoards : 10000000
 ParityWeight : 30
 StabilityWeight : 30
@@ -6,3 +6,5 @@ MobilityWeight : 40
 Prune : 1
 MoveOrdering : 0
 LoadFactor : 6
+StaticEvaluation : 1
+ParallelSearch : 1

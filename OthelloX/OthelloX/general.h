@@ -16,6 +16,18 @@
 #define DEFAULT_STABILITY_WEIGHT 40
 #define DEFAULT_MOBILITY_WEIGHT 30
 
+
+// Represents the game board
+// 0 - free square
+// 1 -	square, occupied by MAX
+// -1  - square occupied by MIN
+typedef int8_t piece;
+// typedef vector<piece> row;
+typedef vector<piece> board;
+
+// Weights for static evaluation
+extern board _squareWeights;
+
 // Holds the evaluation parameters as parsed from params file
 struct evalParams
 {
@@ -30,6 +42,14 @@ struct evalParams
 	int parityWeight;
 	int mobilityWeight;
 	int stabilityWeight;
+	bool parallelSearch = true;
+	// Static evaluation
+	bool useStaticEvaluation = false;
+	piece cornerWeight = 10;
+	piece xSquareWieght = -8;
+	piece cSquareWeight = - 4;
+	piece edgeSquareWeight = 2;
+	piece innerSquareWeight = 1;
 };
 
 extern evalParams _parameters;
@@ -48,6 +68,17 @@ extern int _estMaxDepthPruned;
 extern int _M;
 // Board width
 extern int _N;
+// For parallel evaluation:
+extern int _squaresPerProc;
+extern int _remainderSquares;
+extern board _sharedBoard;
+extern vector<piece> _subScores;
+extern int *_sendCounts;
+extern int *_displacements;
+
+// For parallel processes
+extern int _slaveCount;
+extern int _currentProcId;
 
 // Represents a game move
 // Next figure to go to board[x][y]
@@ -56,11 +87,3 @@ struct gameMove
 	int x;
 	int y;
 };
-
-// Represents the game board
-// 0 - free square
-// 1 -	square, occupied by MAX
-// -1  - square occupied by MIN
-typedef signed char piece;
-// typedef vector<piece> row;
-typedef vector<piece> board;

@@ -145,13 +145,21 @@ void discCount(const board & state, int & maxD, int & minD)
 piece boardAt(const board &state, int y, int x)
 {
 	return state[_N * y + x];
-	// return state[y][x];
+}
+
+piece boardAt(const board &state, int index)
+{
+	return state[index];
 }
 
 void boardAssign(board &state, int y, int x, piece value)
 {
 	state[_N * y + x] = value;
-	// state[y][x] = value;
+}
+
+void boardAssign(board &state, int index, piece value)
+{
+	state[index] = value;
 }
 
 void makeEmptyBoard(board &state)

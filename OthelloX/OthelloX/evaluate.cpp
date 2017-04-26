@@ -1,5 +1,8 @@
 #include "stdafx.h"
 #include "evaluate.h"
+#include "processes.h"
+
+board _squareWeights;
 
 // Returns the number of "stable" MAX discs
 // We call "stable" discs that cannot be flipped back
@@ -80,7 +83,9 @@ int stableDiscCount(const board &state)
 	return result;
 }
 
-int evalBoard(const board & state)
+
+
+int evalBoardDynamic(const board &state)
 {
 	board flippedState = flipAll(state); // Used to calculate values for MIN
 
@@ -128,8 +133,91 @@ int evalBoard(const board & state)
 	return _parameters.parityWeight * parityScore + _parameters.stabilityWeight + stabilityScore + _parameters.mobilityWeight * mobilityScore;
 }
 
+int evalBoardStatic(const board &state)
+{
+	int score = 0;
+	for(int i = 0; i < _M; i++)
+	{
+		for(int j = 0; j < _N; j++)
+			score += boardAt(state, i, j) * boardAt(_squareWeights, i, j);
+	}
+	return score;
+}
+
 int evalBoardStatic(const board &state, int masterId, int slaveCount)
 {
 	int boardSize = _M * _N;
-	int squaresPerSlave = slaveCount / boardSize;
+	int score = 0;
+	if(slaveCount < 2)
+	{
+		return evalBoardStatic(state);
+	}
+	else // We have more than one slave
+	{
+		if(_currentProcId == MASTER_ID)
+		{
+			// Tell everyone more work is on the way
+			int8_t hasWork = true;
+			MPI_Bcast(&hasWork, 1, MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+			// Scatter the data			
+			MPI_Scatterv(&state.front(), _sendCounts, _displacements, MPI_BYTE, NULL, 0, MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+			// Do my own share of the work
+			int masterSubScore = 0;
+			for(int i = _displacements[MASTER_ID]; i < _displacements[MASTER_ID] + _sendCounts[MASTER_ID]; i++)
+			{
+				masterSubScore += state[i] * _squareWeights[i];
+			}
+			// Gather and aggregate results
+			MPI_Reduce(&masterSubScore, &score, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);			
+		}
+		else // Slave?!
+		{
+			LOG_ERR("SLAVE process in static evaluation for MASTER");
+		}
+	}
+	
+	return score;
+}
+
+void fillWeightsMatrix(board &matrix)
+{
+	for(int i = 0; i < _M; i++)
+	{
+		for(int j = 0; j < _N; j++)
+		{
+			// Corners
+			if((i == 0 && j == 0) || (i == 0 && j == _N - 1) || (i == _M - 1 && j == 0) || (i == _M - 1 && j == _N - 1))
+				boardAssign(matrix, i, j, _parameters.cornerWeight);
+			// C-squares
+			else if((i == 0 && j == 1) || (i == 0 && j == _N - 2) || (i == 1 && j == 0) || (i == 1 && j == _N - 1) || 
+					(i == _M - 2 && j == 0) || (i == _M - 2 && j == _N - 1) || (i == _M - 1 && j == 1) || (i == _M - 1 && j == _N - 2))
+				boardAssign(matrix, i, j, _parameters.cSquareWeight);
+			// X-squares
+			else if((i == 1 && j == 1) || (i == 1 && j == _N - 2) || (i == _M - 2 && j == 1) || (i == _M - 2 && j == _N - 2))
+				boardAssign(matrix, i, j, _parameters.xSquareWieght);
+			// Edges
+			else if((i == 0) || (i == _M - 1) || (j == 0) || (j == _N - 1))
+				boardAssign(matrix, i, j, _parameters.edgeSquareWeight);
+			// Inner squares
+			else if((i > 1 && i < _M - 2 && j > 1 && j < _N - 2))
+				boardAssign(matrix, i, j , _parameters.innerSquareWeight);
+			else
+				boardAssign(matrix, i, j, 0);
+		}
+	}
+}
+
+int evalBoard(const board &state)
+{
+	if(_parameters.useStaticEvaluation)
+	{
+		if(_parameters.parallelSearch)
+			return evalBoardStatic(state);
+		else
+			return evalBoardStatic(state, MASTER_ID, _slaveCount);
+	}
+	else
+	{
+		return evalBoardDynamic(state);
+	}
 }

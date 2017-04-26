@@ -1,3 +1,4 @@
+#pragma once
 #include "stdafx.h"
 #include "general.h"
 #include "board.h"
@@ -8,12 +9,18 @@
 #define FLAG_MORE_JOBS_TRUE 1
 #define FLAG_MORE_JOBS_FALSE 0
 
+// The slaves are processes 0 to (N-2) and process (N-1) is the master
+#define MASTER_ID _slaveCount
+
 enum Tags
 {
     MORE_JOBS,
     SEARCH_JOB,
     SEARCH_JOB_RESULT,
-    SEARCH_JOB_STATS
+    SEARCH_JOB_STATS,
+    STATIC_EVAL_MORE_WORK,
+    STATIC_EVAL_DATA,
+    STATIC_EVAL_RESULT
 };
 
 
@@ -69,6 +76,9 @@ jobResult receiveResult(int &slaveId);
 
 void slaveMain(int masterId, int slaveId);
 
+// Parallel evaluation
+void slaveBoardEval();
+
 // Receive a job from process <masterId>
 long long receiveJob(searchJob &job, int masterId);
 
@@ -77,3 +87,5 @@ jobResult doJob(searchJob job);
 
 // Send results back
 void sendResult(jobResult result, int masterId);
+
+
