@@ -85,7 +85,7 @@ int stableDiscCount(const board &state)
 
 
 
-int evalBoardDynamic(const board &state)
+int evalBoardDynamic(const board &state, bool isFinal, int maxMoves, int minMoves)
 {
 	board flippedState = flipAll(state); // Used to calculate values for MIN
 
@@ -94,8 +94,6 @@ int evalBoardDynamic(const board &state)
 	// Score based on the disc count
 	float parityScore = 100 * (maxDiscs - minDiscs) / ((float)(maxDiscs + minDiscs));
 
-	int maxMoves = getMoves(state, true).size();
-	int minMoves = getMoves(state, false).size();
 	// Score based on the mobility(number of available moves) for each player
 	float mobilityScore = 0;
 	if (maxMoves + minMoves != 0)
@@ -133,7 +131,7 @@ int evalBoardDynamic(const board &state)
 	return _parameters.parityWeight * parityScore + _parameters.stabilityWeight + stabilityScore + _parameters.mobilityWeight * mobilityScore;
 }
 
-int evalBoardStatic(const board &state)
+int evalBoardStatic(const board &state, bool isFinal)
 {
 	int score = 0;
 	for(int i = 0; i < _M; i++)
@@ -144,13 +142,12 @@ int evalBoardStatic(const board &state)
 	return score;
 }
 
-int evalBoardStatic(const board &state, int masterId, int slaveCount)
+int evalBoardStatic(const board &state, int masterId, int slaveCount, bool isFinal)
 {
-	int boardSize = _M * _N;
 	int score = 0;
 	if(slaveCount < 2)
 	{
-		return evalBoardStatic(state);
+		return evalBoardStatic(state, isFinal);
 	}
 	else // We have more than one slave
 	{
@@ -158,24 +155,49 @@ int evalBoardStatic(const board &state, int masterId, int slaveCount)
 		{
 			// Tell everyone more work is on the way
 			int8_t hasWork = true;
+			timePoint before = timeNow(), after;
 			MPI_Bcast(&hasWork, 1, MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
-			// Scatter the data			
+			after = timeNow();
+			_parallelEvalCommTime += nsBetween(before, after);
+
+			// Tell them if it's a final evaluation
+			before = timeNow();
+			MPI_Bcast(&isFinal, 1, MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+			after = timeNow();
+			_parallelEvalCommTime += nsBetween(before, after);
+
+			// Scatter the data
+			before = timeNow();	
 			MPI_Scatterv(&state.front(), _sendCounts, _displacements, MPI_BYTE, NULL, 0, MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+			after = timeNow();
+			_parallelEvalCommTime += nsBetween(before, after);
+
 			// Do my own share of the work
 			int masterSubScore = 0;
 			for(int i = _displacements[MASTER_ID]; i < _displacements[MASTER_ID] + _sendCounts[MASTER_ID]; i++)
 			{
 				masterSubScore += state[i] * _squareWeights[i];
 			}
-			// Gather and aggregate results
-			MPI_Reduce(&masterSubScore, &score, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);			
+
+			// Gather results
+			before = timeNow();
+			MPI_Gather(&masterSubScore, 1, MPI_INT, _subScores, 1, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
+			after = timeNow();
+			_parallelEvalCommTime += nsBetween(before, after);
+
+			// Aggregate
+			for(int procId = 0; procId < _slaveCount + 1; procId++)
+			{
+				score += _subScores[procId];
+			}
+
+			// MPI_Reduce(&masterSubScore, &score, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);
 		}
 		else // Slave?!
 		{
 			LOG_ERR("SLAVE process in static evaluation for MASTER");
 		}
 	}
-	
 	return score;
 }
 
@@ -207,17 +229,23 @@ void fillWeightsMatrix(board &matrix)
 	}
 }
 
-int evalBoard(const board &state)
+int evalBoard(const board &state, bool isFinal, int maxMoves, int minMoves)
 {
+	int result;
+	timePoint before = timeNow();
+	timePoint after;
 	if(_parameters.useStaticEvaluation)
 	{
 		if(_parameters.parallelSearch)
-			return evalBoardStatic(state);
+			result = evalBoardStatic(state, isFinal);
 		else
-			return evalBoardStatic(state, MASTER_ID, _slaveCount);
+			result = evalBoardStatic(state, MASTER_ID, _slaveCount, isFinal);
 	}
 	else
 	{
-		return evalBoardDynamic(state);
+		result = evalBoardDynamic(state, isFinal, maxMoves, minMoves);
 	}
+	after = timeNow();
+	_totalEvaluationTime += nsBetween(before, after);
+	return result;
 }

@@ -1,6 +1,7 @@
 #include "processes.h"
 #include "search.h"
 #include "timing.h"
+#include "stats.h"
 
 /*
 ********* MASTER FUNCTIONS *********
@@ -13,6 +14,7 @@ void masterMain(board initState, int slaveCount)
     timePoint masterEnd;
     long long totalMasterTime = 0;
     long long totalRecvTime = 0;
+    long long totalRecvStatsTime = 0;    
     long long totalSendTime = 0;
     long long nodeGenerationTime = 0;
     long long scorePropagationTime = 0;
@@ -24,11 +26,6 @@ void masterMain(board initState, int slaveCount)
     generateNodes(initState, slaveCount * _parameters.loadFactor, nodes, jobQueue);
     after = timeNow();
     nodeGenerationTime = nsBetween(before, after);
-
-    for(stateNode n: nodes)
-    {
-        cout << "==========\n" << printBoard(n.state, true);
-    }
 
     int jobsToComplete = jobQueue.size(); // How many jobs do we have in the pool at the start
     cout << "Job count: " << jobsToComplete << endl;
@@ -98,7 +95,10 @@ void masterMain(board initState, int slaveCount)
 
         // Receive stats
         slaveStats stats;
+        before = timeNow();
         MPI_Recv(&stats, sizeof(slaveStats), MPI_CHAR, slaveId, Tags::SEARCH_JOB_STATS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        after = timeNow();
+        totalRecvStatsTime += nsBetween(before, after);
         jobStats[slaveId].push_back(stats);
 
         // Update the node with the result
@@ -150,20 +150,25 @@ void masterMain(board initState, int slaveCount)
 
     // Time the whole function
     masterEnd = timeNow();
-    totalMasterTime = nsBetween(masterStart, masterEnd);
+    totalMasterTime = nsBetween(masterStart, masterEnd) - totalRecvStatsTime; // Do not take in account the time taken to communicate stats
 
     writeStatsToFile(jobStats);
 
     cout << "---------" << endl;
     cout << "Master spent " << totalSendTime << " ns sending data" << endl;
     cout << "Master spent " << totalRecvTime << " ns receiving data" << endl;
+    cout << "Master spent " << totalRecvStatsTime << " ns receiving stats" << endl;    
     cout << "Master spent " << nodeGenerationTime << " ns generating nodes" << endl;
     cout << "Master spent " << scorePropagationTime << " ns propagating scores" << endl;
     cout << "Master spent " << totalMasterTime << " ns in total" << endl;
-    cout << "Sum of subtimes: " << totalSendTime + totalRecvTime + nodeGenerationTime + scorePropagationTime << " ns" << endl;
+    cout << "Master sequential part: " << totalMasterTime - totalRecvTime - totalSendTime << endl;
+    cout << "Sequential part / Total time: " <<  (totalMasterTime - totalRecvTime) / (double) totalMasterTime << endl;
+    cout << "Sum of subtimes: " << totalSendTime + totalRecvTime + nodeGenerationTime + scorePropagationTime + totalRecvStatsTime << " ns" << endl;
     
+    parallelSearchStatsToFile(jobStats, totalMasterTime, totalMasterTime - totalRecvTime - totalSendTime);
     outputStats(jobStats, totalMasterTime);
-    
+
+
     cout << "Root moves: " << endl;
     for (valueMove mv : rootOrderedMoves)
     {
@@ -391,16 +396,28 @@ void slaveBoardEval()
             delete [] block;
             return;
         }        
+
+        // Is this a final board?
+        bool isFinal;
+        MPI_Bcast(&isFinal, 1, MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+
         // Receive data
         MPI_Scatterv(NULL, NULL, NULL, MPI_BYTE, block, _sendCounts[_currentProcId], MPI_BYTE, MASTER_ID, MPI_COMM_WORLD);
+        
         // Calculate subscore
         int subScore = 0;
         for(int i = 0; i < _sendCounts[_currentProcId]; i++)
         {
-            subScore += block[i] * _squareWeights[_displacements[_currentProcId] + i];
+            if(isFinal)
+                subScore += block[i];
+            else
+                subScore += block[i] * _squareWeights[_displacements[_currentProcId] + i];
         }
+        
         // Send data back to be aggregated
-        MPI_Reduce(&subScore, NULL, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);
+        MPI_Gather(&subScore, 1, MPI_INT, NULL, 0, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
+
+        // MPI_Reduce(&subScore, NULL, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);
     }
     delete [] block;
 }

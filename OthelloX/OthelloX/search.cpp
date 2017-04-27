@@ -2,7 +2,6 @@
 #include "search.h"
 
 #define MOVE_ORDER_SEARCH_DEPTH 2
-#define AVG_BRANCH_FACTOR 7
 
 // The parameters for searching
 evalParams _parameters;
@@ -26,25 +25,24 @@ int negaMax(const board &state, short depth, short alpha, short beta, bool maxTu
 
 	if (!isProbe && _parameters.maxDepth - depth > _maxDepthReached)
 		_maxDepthReached = _parameters.maxDepth - depth;
+	
+	vector<gameMove> moves = getMoves(state, maxTurn);
+	vector<gameMove> opponentMoves = getMoves(state, !maxTurn);
 
 	if (depth <= 0 || secondsElapsed() > _parameters.timeout)
 	{
 		// if(!isProbe) LOG_DEBUG("DEPTH is " << depth << " or out of time");
+		
 		if(!isProbe) _boardsEvaluated++;
 		// If we have more moves but we have to stop, we haven't checked everything
 		if(!isProbe && (getMoves(state, true).size() > 0 || getMoves(state,false).size() > 0))
 			_entireSpaceCovered = false;
 		// Always evaluate for MAX!
-		return evalBoard(state) * multiplier;
+		return evalBoard(state, moves.size() == 0 && opponentMoves.size() == 0, 
+				maxTurn ? moves.size() : opponentMoves.size(), maxTurn ? opponentMoves.size() : moves.size()) * multiplier;
 	}
 
-	vector<gameMove> moves(0);
-
-	if (isProbe || !_parameters.useMoveOrdering)
-	{
-		moves = getMoves(state, maxTurn);
-	}
-	else
+	if (!isProbe && _parameters.useMoveOrdering)
 	{
 		moves = treeSearch(state, MOVE_ORDER_SEARCH_DEPTH, true, maxTurn);
 	}
@@ -52,14 +50,11 @@ int negaMax(const board &state, short depth, short alpha, short beta, bool maxTu
 	// If no moves - evaluate board
 	if (moves.size() == 0)
 	{
-		// LOG_DEBUG(" No more moves for MAX, board: " << endl << printBoard(state, _parameters.black));
-		vector<gameMove> opponentMoves = getMoves(state, !maxTurn);
-
 		if (opponentMoves.size() == 0)
 		{
 			// LOG_DEBUG(" No more moves for MIN, board: " << endl << printBoard(state, _parameters.black));
 			if(!isProbe) _boardsEvaluated++;
-			return evalBoard(state) * multiplier;
+			return evalBoard(state, true, maxTurn ? moves.size() : opponentMoves.size(), maxTurn ? opponentMoves.size() : moves.size()) * multiplier;
 		}
 		else
 		{
@@ -72,8 +67,8 @@ int negaMax(const board &state, short depth, short alpha, short beta, bool maxTu
 	if (_boardsEvaluated + moves.size() > _parameters.maxBoards)
 	{
 		if(!isProbe) _boardsEvaluated++;
-		//_entireSpaceCovered = false;
-		return evalBoard(state) * multiplier;
+		_entireSpaceCovered = false;
+		return evalBoard(state, false, maxTurn ? moves.size() : opponentMoves.size(), maxTurn ? opponentMoves.size() : moves.size()) * multiplier;
 	}
 
 	int maxValue = INT_MIN + 1;

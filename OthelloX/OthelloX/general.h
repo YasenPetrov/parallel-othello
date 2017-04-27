@@ -5,17 +5,22 @@
 
 #include "stdafx.h"
 
+// A billion
+#define BLN_FLOAT 1000000000.0f
+#define BLN_DOUBLE 1000000000.0
+
 // Constants for board entries
 #define BRD_MIN_DISC -1
 #define BRD_MAX_DISC 1
 #define BRD_FREE 0
+
+#define AVG_BRANCH_FACTOR 7
 
 #define DEFAULT_LOAD_FACTOR 10
 // Default wieghts for the utillity heuristic
 #define DEFAULT_PARITY_WEIGHT 30
 #define DEFAULT_STABILITY_WEIGHT 40
 #define DEFAULT_MOBILITY_WEIGHT 30
-
 
 // Represents the game board
 // 0 - free square
@@ -25,8 +30,7 @@ typedef int8_t piece;
 // typedef vector<piece> row;
 typedef vector<piece> board;
 
-// Weights for static evaluation
-extern board _squareWeights;
+extern Mode _runMode;
 
 // Holds the evaluation parameters as parsed from params file
 struct evalParams
@@ -68,17 +72,22 @@ extern int _estMaxDepthPruned;
 extern int _M;
 // Board width
 extern int _N;
+// Weights for static evaluation
+extern board _squareWeights;
 // For parallel evaluation:
 extern int _squaresPerProc;
 extern int _remainderSquares;
 extern board _sharedBoard;
-extern vector<piece> _subScores;
 extern int *_sendCounts;
 extern int *_displacements;
-
+extern int *_subScores;
 // For parallel processes
 extern int _slaveCount;
 extern int _currentProcId;
+// For timing
+extern long long _totalEvaluationTime;
+extern long long _parallelEvalCommTime;
+extern long long _parallelEvalCompTime;
 
 // Represents a game move
 // Next figure to go to board[x][y]

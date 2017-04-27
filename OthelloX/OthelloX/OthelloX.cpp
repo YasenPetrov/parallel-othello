@@ -15,9 +15,15 @@ int _slaveCount = -1;
 int _squaresPerProc;
 int _remainderSquares;
 board _sharedBoard;
-vector<piece> _subScores;
 int *_sendCounts;
 int *_displacements;
+int *_subScores;
+
+
+long long _totalEvaluationTime = 0;
+long long _parallelEvalCommTime = 0;
+long long _parallelEvalCompTime = 0;
+
 
 int main(int argc, char** argv)
 {
@@ -75,9 +81,9 @@ int main(int argc, char** argv)
 			_squaresPerProc = (_N * _M) / worldSize;
 			_remainderSquares = (_N * _M) % worldSize;
 			_sharedBoard = board(_N * _M, 0);
-			_subScores = vector<piece>(worldSize, 0);
 			_sendCounts = new int[worldSize];
 			_displacements = new int[worldSize];
+			_subScores = new int[worldSize];
 			int nextSquareIndex = 0; // Displacement
 			int procsWithExtraSquare = _remainderSquares;
 			for(int procId = 0; procId < worldSize; procId++)
@@ -97,7 +103,7 @@ int main(int argc, char** argv)
 	{
 		if(_currentProcId != MASTER_ID)
 		{
-			if(_parameters.parallelSearch) // If we want to do parallel search but we have only one slave, kill it an let the master do the work
+			if(_parameters.parallelSearch || !_parameters.useStaticEvaluation) // If we want to do parallel search but we have only one slave, kill it an let the master do the work
 			{
 				MPI_Finalize();
 				return 0;
@@ -107,7 +113,11 @@ int main(int argc, char** argv)
 		{
 			cout << "Running search.." << endl;
 			_parameters.parallelSearch = false;
+			timePoint before = timeNow();
+			timePoint after;
 			vector<gameMove> nextMoves = treeSearch(state, _parameters.maxDepth, false, true); // Play for MAX
+			after = timeNow();
+			long long nsForSearch = nsBetween(before, after);
 			secondsForSearch = secondsElapsed();
 			
 			if (nextMoves.size() == 0)
@@ -127,7 +137,17 @@ int main(int argc, char** argv)
 			cout << "Depth of boards: " << _maxDepthReached << endl;
 			cout << "Entire space: " << _entireSpaceCovered << endl;
 			cout << "Elapsed time in seconds: " << secondsForSearch << endl;
+			cout << "Elapsed time in seconds: " << (nsForSearch / BLN_DOUBLE) << endl;
+			cout << "Search without evaluation: " << (nsForSearch - _totalEvaluationTime) / BLN_DOUBLE << endl; 
 			cout << "Boards per second: " << _boardsEvaluated / secondsForSearch << endl;
+			cout << "Total evaluation time: " << _totalEvaluationTime / BLN_DOUBLE << endl;
+			cout << "Parallel evaluation comm time: " << _parallelEvalCommTime / BLN_DOUBLE << endl;
+			cout << "comm/totTime for evaluation: " << (double)_parallelEvalCommTime / (double)_totalEvaluationTime << endl;
+			cout << "Master spent ns on comp in parallel eval: " << (_totalEvaluationTime - _parallelEvalCommTime) / BLN_DOUBLE << endl;
+			cout << "Diff btw start and end of computation in master: " << _parallelEvalCompTime / BLN_DOUBLE << endl;
+
+			// Save stats to file
+			staticEvalStatsToFile(secondsForSearch);
 
 			// If we have slaves, tell them they'll get no more work
 			int8_t moreWork = false;
