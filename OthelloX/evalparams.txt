@@ -1,4 +1,4 @@
-MaxDepth: 1
+MaxDepth: 8
 MaxBoards : 10000000
 ParityWeight : 30
 StabilityWeight : 30

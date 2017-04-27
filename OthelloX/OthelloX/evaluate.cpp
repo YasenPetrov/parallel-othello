@@ -179,19 +179,22 @@ int evalBoardStatic(const board &state, int masterId, int slaveCount, bool isFin
 				masterSubScore += state[i] * _squareWeights[i];
 			}
 
-			// Gather results
+			// // Gather results
+			// before = timeNow();
+			// MPI_Gather(&masterSubScore, 1, MPI_INT, _subScores, 1, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
+			// after = timeNow();
+			// _parallelEvalCommTime += nsBetween(before, after);
+
+			// // Aggregate
+			// for(int procId = 0; procId < _slaveCount + 1; procId++)
+			// {
+			// 	score += _subScores[procId];
+			// }
+
 			before = timeNow();
-			MPI_Gather(&masterSubScore, 1, MPI_INT, _subScores, 1, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
+			MPI_Reduce(&masterSubScore, &score, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);
 			after = timeNow();
 			_parallelEvalCommTime += nsBetween(before, after);
-
-			// Aggregate
-			for(int procId = 0; procId < _slaveCount + 1; procId++)
-			{
-				score += _subScores[procId];
-			}
-
-			// MPI_Reduce(&masterSubScore, &score, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);
 		}
 		else // Slave?!
 		{

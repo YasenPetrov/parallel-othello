@@ -410,14 +410,14 @@ void slaveBoardEval()
         {
             if(isFinal)
                 subScore += block[i];
-            else
+            else // TODO: If corner is captured, negate scores for C and X squares
                 subScore += block[i] * _squareWeights[_displacements[_currentProcId] + i];
         }
         
         // Send data back to be aggregated
-        MPI_Gather(&subScore, 1, MPI_INT, NULL, 0, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
+        // MPI_Gather(&subScore, 1, MPI_INT, NULL, 0, MPI_INT, MASTER_ID, MPI_COMM_WORLD);
 
-        // MPI_Reduce(&subScore, NULL, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);
+        MPI_Reduce(&subScore, NULL, 1, MPI_INT, MPI_SUM, MASTER_ID, MPI_COMM_WORLD);
     }
     delete [] block;
 }

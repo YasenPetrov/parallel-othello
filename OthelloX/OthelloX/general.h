@@ -30,8 +30,6 @@ typedef int8_t piece;
 // typedef vector<piece> row;
 typedef vector<piece> board;
 
-extern Mode _runMode;
-
 // Holds the evaluation parameters as parsed from params file
 struct evalParams
 {
